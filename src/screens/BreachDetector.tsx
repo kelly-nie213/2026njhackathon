@@ -1266,11 +1266,27 @@ function ReputationCard({ rep }: { rep: Reputation }) {
             </div>
           );
         })}
+        {rep.notChecked.map((n) => (
+          <div key={n.name} className="rounded-xl border border-white/8 bg-white/[0.02] p-4 opacity-70">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2.5 w-2.5 flex-none rounded-full bg-white/25" />
+                <span className="font-semibold">{n.name}</span>
+                <span className="text-sm text-fg/85">— not checked</span>
+              </div>
+              <span className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-muted" style={{ background: "rgba(255,255,255,0.08)" }}>
+                Not checked
+              </span>
+            </div>
+            <p className="mt-1.5 text-sm text-muted">
+              This source wasn't queried, so it's neither a pass nor a fail. {n.reason}.
+            </p>
+          </div>
+        ))}
       </div>
       {rep.notChecked.length > 0 && (
         <p className="mt-3 text-[11px] text-muted">
-          Not checked:{" "}
-          {rep.notChecked.map((n) => `${n.name} (${n.reason})`).join(" · ")}
+          Add the keys above to your <span className="font-mono">.env</span> and restart the API to turn these on — all are free to obtain.
         </p>
       )}
     </div>
