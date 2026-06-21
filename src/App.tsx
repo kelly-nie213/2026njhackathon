@@ -5,6 +5,7 @@ import Scanning from "./screens/Scanning";
 import Dashboard from "./screens/Dashboard";
 import PhishingChecker from "./screens/PhishingChecker";
 import IncidentTriage from "./screens/IncidentTriage";
+import BreachDetector from "./screens/BreachDetector";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/phishing" element={<PhishingChecker />} />
         <Route path="/triage" element={<IncidentTriage />} />
+        <Route path="/breachdetector" element={<BreachDetector />} />
       </Routes>
     </ScanProvider>
   );

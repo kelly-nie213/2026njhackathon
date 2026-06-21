@@ -51,6 +51,12 @@ export default function Onboarding() {
         <Brand />
         <div className="flex items-center gap-3">
           <button
+            onClick={() => nav("/breachdetector")}
+            className="rounded-full border border-brand-400/40 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20"
+          >
+            🔍 BreachDetector
+          </button>
+          <button
             onClick={() => nav("/triage")}
             className="rounded-full border border-risk-high/40 bg-risk-crit/10 px-3 py-1 text-xs font-medium text-risk-high transition hover:bg-risk-crit/20"
           >
