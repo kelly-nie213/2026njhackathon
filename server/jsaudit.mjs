@@ -12,7 +12,8 @@ const FETCH_TIMEOUT_MS = 9000;
 const MAX_SCRIPTS = 12; // how many JS files we download & scan
 const MAX_BYTES = 2_000_000; // skip absurdly large bundles
 const TIME_BUDGET_MS = 45000;
-const PER_PATTERN_CAP = 6; // don't flood the report with the same issue
+const PER_PATTERN_CAP = 6; // don't flood the report with the same issue (per file)
+const GLOBAL_RULE_CAP = 5; // …and per rule across the whole site
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 AegisJSAuditor/1.0";
@@ -44,10 +45,10 @@ const RULES = [
     detail: "An AWS access-key ID is embedded in client-side code. Anyone can read it and may pair it with a leaked secret to access your cloud account.",
   },
   {
-    id: "google-key", category: "security", severity: "high",
-    title: "Exposed Google API key",
+    id: "google-key", category: "security", severity: "low",
+    title: "Browser API key in page (verify it's restricted)",
     re: /\bAIza[0-9A-Za-z\-_]{35}\b/g,
-    detail: "A Google API key is shipped to the browser. If it isn't restricted to your domain, attackers can run up usage/billing on your account.",
+    detail: "A Google API key is shipped to the browser. Many such keys are meant to be public (Maps, reCAPTCHA) and are safe IF locked to your domain. Confirm this one is restricted; an unrestricted key can run up billing on your account.",
   },
   {
     id: "stripe-secret", category: "security", severity: "critical",
@@ -195,6 +196,28 @@ const LIBRARY_RULES = [
   },
 ];
 
+// High-precision rules: specific enough to stay trustworthy even inside huge
+// minified third-party bundles. The rest (generic XSS sinks, hygiene nits) fire
+// constantly in any large minified app and are mostly unactionable noise there,
+// so we run them ONLY on non-minified code (usually the org's own readable
+// scripts), where the same patterns are meaningful.
+const PRECISE_IDS = new Set([
+  "aws-key", "stripe-secret", "slack-token", "private-key", "jwt",
+  "generic-secret", "google-key", "ls-secret", "sourcemap",
+]);
+
+// Findings only worth reporting on the org's OWN scripts (first-party). A public
+// browser key on a third-party widget isn't the nonprofit's to fix.
+const FIRST_PARTY_ONLY = new Set(["google-key"]);
+
+/** Heuristic: is this a minified/bundled file (one giant line, no real formatting)? */
+function isMinified(code) {
+  if (!code || code.length < 3000) return false;
+  const newlines = (code.match(/\n/g) || []).length;
+  const avgLineLen = code.length / (newlines + 1);
+  return avgLineLen > 200; // hand-written code wraps long before this
+}
+
 /** Count which 1-based line `index` falls on, and return that line trimmed. */
 function locate(text, index) {
   let line = 1;
@@ -214,12 +237,16 @@ function locate(text, index) {
   return { line, snippet };
 }
 
-function scanText(text, file, party) {
+function scanText(text, file, party, minified) {
   const findings = [];
   // Collapse repeats on the same line (minified bundles are one long line, so
   // the same sink can match dozens of times) — one row per rule+line.
   const seen = new Set();
   for (const rule of RULES) {
+    // In minified bundles, only the high-precision rules are trustworthy.
+    if (minified && !PRECISE_IDS.has(rule.id)) continue;
+    // Skip first-party-only rules on third-party scripts.
+    if (FIRST_PARTY_ONLY.has(rule.id) && party === 1) continue;
     let count = 0;
     rule.re.lastIndex = 0;
     for (const m of text.matchAll(rule.re)) {
@@ -337,7 +364,7 @@ export async function auditDomainJs(domain) {
   inline.forEach((code, i) => {
     const file = `${baseHost} (inline #${i + 1})`;
     scripts.push({ file, url: home, party: 0, bytes: code.length, inline: true });
-    findings.push(...scanText(code, file, 0));
+    findings.push(...scanText(code, file, 0, isMinified(code)));
   });
 
   // Download & scan external scripts up to our caps / time budget.
@@ -359,7 +386,7 @@ export async function auditDomainJs(domain) {
       })();
       const file = shortName(url, baseHost);
       scripts.push({ file, url, party: isFirst, bytes: code.length, inline: false });
-      findings.push(...scanText(code, file, isFirst));
+      findings.push(...scanText(code, file, isFirst, isMinified(code)));
     } catch {
       /* skip unreachable/slow script */
     }
@@ -373,8 +400,17 @@ export async function auditDomainJs(domain) {
       (a.category === b.category ? 0 : a.category === "security" ? -1 : 1)
   );
 
+  // Global cap per rule so one noisy pattern can't dominate the whole report.
+  const perId = new Map();
+  const capped = findings.filter((f) => {
+    const n = perId.get(f.id) || 0;
+    if (n >= GLOBAL_RULE_CAP) return false;
+    perId.set(f.id, n + 1);
+    return true;
+  });
+
   const counts = { critical: 0, high: 0, medium: 0, low: 0, security: 0, bug: 0 };
-  for (const f of findings) {
+  for (const f of capped) {
     counts[f.severity]++;
     counts[f.category]++;
   }
@@ -383,7 +419,7 @@ export async function auditDomainJs(domain) {
     domain: host,
     scriptsScanned: scripts,
     externalFound: external.length,
-    findings,
+    findings: capped,
     counts,
   };
 }
