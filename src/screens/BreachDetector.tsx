@@ -180,144 +180,38 @@ export default function BreachDetector() {
 }
 
 /* ──────────────────────────────────────────────
-   CYBER SHIELD — animated hero illustration
+   SHIELD HERO — stroke-only shield + orbiting Liquid Glass badges
 ────────────────────────────────────────────── */
 
-function CyberShield() {
+function StatusBadge({ label, color, className }: { label: string; color: string; className: string }) {
   return (
-    <div className="relative flex justify-center lg:justify-start float">
-      {/* Ambient glow blob */}
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{
-          background: "radial-gradient(ellipse, rgba(99,102,241,0.25) 0%, transparent 70%)",
-          filter: "blur(40px)",
-          transform: "scale(1.4)",
-        }}
-      />
+    <span className={`lg-pill absolute ${className}`} style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="pulse-dot inline-block h-1.5 w-1.5 flex-none rounded-full" style={{ background: color }} />
+      {label}
+    </span>
+  );
+}
 
-      <svg
-        width="260"
-        height="260"
-        viewBox="0 0 260 260"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        style={{ filter: "drop-shadow(0 0 22px rgba(99,102,241,0.45))" }}
-      >
-        <defs>
-          <linearGradient id="shieldFill" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"   stopColor="#818cf8" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#a3e635" stopOpacity="0.85" />
-          </linearGradient>
-          <radialGradient id="shieldHighlight" cx="50%" cy="38%" r="55%">
-            <stop offset="0%"   stopColor="white" stopOpacity="0.30" />
-            <stop offset="100%" stopColor="white" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="outerRing" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"   stopColor="#6366f1" stopOpacity="0.58" />
-            <stop offset="50%"  stopColor="#a3e635" stopOpacity="0.38" />
-            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.58" />
-          </linearGradient>
-          <filter id="nodeglow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-        </defs>
-
-        {/* ── Outer rotating dashed ring ── */}
-        <motion.g
-          animate={{ rotate: 360 }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          style={{ transformOrigin: "130px 130px" }}
-        >
-          <circle
-            cx="130" cy="130" r="118"
-            stroke="url(#outerRing)" strokeWidth="1"
-            fill="none" strokeDasharray="8 14"
-          />
-          {/* Orbit nodes */}
-          <circle cx="248" cy="130" r="5"   fill="#818cf8" filter="url(#nodeglow)" />
-          <circle cx="130" cy="12"  r="4"   fill="#a3e635" filter="url(#nodeglow)" />
-          <circle cx="12"  cy="130" r="4.5" fill="#818cf8" filter="url(#nodeglow)" />
-          <circle cx="130" cy="248" r="4"   fill="#34d399" filter="url(#nodeglow)" />
-        </motion.g>
-
-        {/* ── Inner counter-rotating ring ── */}
-        <motion.g
-          animate={{ rotate: -360 }}
-          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-          style={{ transformOrigin: "130px 130px" }}
-        >
-          <circle
-            cx="130" cy="130" r="86"
-            stroke="rgba(99,102,241,0.22)" strokeWidth="0.8"
-            fill="none" strokeDasharray="4 9"
-          />
-          <circle cx="216" cy="130" r="3"   fill="#a3e635" opacity="0.85" />
-          <circle cx="130" cy="44"  r="2.5" fill="#818cf8" opacity="0.85" />
-          <circle cx="44"  cy="130" r="2.5" fill="#a3e635" opacity="0.85" />
-        </motion.g>
-
-        {/* ── Shield body ── */}
+function ShieldHero() {
+  return (
+    <div className="relative mb-9 grid place-items-center" style={{ width: 240, height: 170 }}>
+      {/* stroke-only shield with checkmark that draws on load */}
+      <svg width="104" height="120" viewBox="0 0 64 74" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
-          d="M130 48 L185 74 L185 132 Q185 183 130 204 Q75 183 75 132 L75 74 Z"
-          fill="url(#shieldFill)"
+          d="M32 5 L56 14 L56 36 C56 52 45 64 32 69 C19 64 8 52 8 36 L8 14 Z"
+          stroke="#ffffff" strokeWidth="2" strokeLinejoin="round" fill="none"
         />
-        {/* Inner highlight */}
         <path
-          d="M130 58 L175 82 L175 132 Q175 175 130 192 Q85 175 85 132 L85 82 Z"
-          fill="url(#shieldHighlight)"
-        />
-        {/* Check mark */}
-        <path
-          d="M110 130 L124 144 L152 114"
-          stroke="white" strokeWidth="4.5" fill="none"
+          className="draw-check"
+          d="M21 37 L29 45 L44 28"
+          stroke="#ffffff" strokeWidth="2.5" fill="none"
           strokeLinecap="round" strokeLinejoin="round"
         />
-
-        {/* ── Floating badge pills ── */}
-        {/* SECURE */}
-        <g opacity="0.88">
-          <rect x="176" y="86" width="62" height="21" rx="10.5"
-            fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" strokeWidth="0.8" />
-          <text x="207" y="101" textAnchor="middle" fontSize="9"
-            fill="#34d399" fontFamily="'SF Mono',monospace" fontWeight="700" letterSpacing="1">
-            SECURE
-          </text>
-        </g>
-        {/* SCANNING */}
-        <motion.g
-          animate={{ opacity: [0.65, 1, 0.65] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <rect x="18" y="104" width="68" height="21" rx="10.5"
-            fill="rgba(251,191,36,0.12)" stroke="rgba(251,191,36,0.35)" strokeWidth="0.8" />
-          <text x="52" y="119" textAnchor="middle" fontSize="9"
-            fill="#fbbf24" fontFamily="'SF Mono',monospace" fontWeight="700" letterSpacing="1">
-            SCANNING
-          </text>
-        </motion.g>
-        {/* BREACH */}
-        <motion.g
-          animate={{ opacity: [0.55, 0.9, 0.55] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-        >
-          <rect x="178" y="158" width="58" height="21" rx="10.5"
-            fill="rgba(244,63,94,0.12)" stroke="rgba(244,63,94,0.35)" strokeWidth="0.8" />
-          <text x="207" y="173" textAnchor="middle" fontSize="9"
-            fill="#fb7185" fontFamily="'SF Mono',monospace" fontWeight="700" letterSpacing="1">
-            BREACH
-          </text>
-        </motion.g>
-
-        {/* Horizontal scan line */}
-        <motion.line
-          x1="75" y1="132" x2="185" y2="132"
-          stroke="rgba(96,165,250,0.5)" strokeWidth="1.2"
-          animate={{ y1: [82, 182, 82], y2: [82, 182, 82], opacity: [0, 0.7, 0] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        />
       </svg>
+
+      <StatusBadge label="SCANNING" color="#0a84ff" className="top-1 right-0" />
+      <StatusBadge label="SECURE"   color="#30d158" className="top-1/2 -left-2 -translate-y-1/2" />
+      <StatusBadge label="BREACH"   color="#ff453a" className="bottom-2 right-2" />
     </div>
   );
 }
@@ -326,6 +220,16 @@ function CyberShield() {
    INPUT VIEW
 ────────────────────────────────────────────── */
 
+/* SF-Symbols-style stroke icons (no emoji) for the trust row. */
+function TrustIcon({ name }: { name: "lock" | "globe" | "bolt" }) {
+  const common = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (name === "lock")
+    return (<svg {...common}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>);
+  if (name === "globe")
+    return (<svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>);
+  return (<svg {...common}><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>);
+}
+
 function InputView(props: {
   orgName: string; setOrgName: (v: string) => void;
   domain: string;  setDomain:  (v: string) => void;
@@ -333,73 +237,72 @@ function InputView(props: {
   onSubmit: () => void; onExample: () => void;
 }) {
   const { orgName, setOrgName, domain, setDomain, canSubmit, error, onSubmit, onExample } = props;
+  const labelClass = "mb-2 block text-[13px] font-medium uppercase tracking-[0.06em] text-white/40";
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="grid items-center gap-10 pt-8 lg:grid-cols-2"
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex flex-col items-center pt-12"
     >
-      {/* Left — hero copy + graphic */}
-      <div>
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-risk-high/30 bg-risk-crit/10 px-3 py-1 text-xs font-medium text-risk-high">
-          <span className="h-1.5 w-1.5 rounded-full bg-risk-high" />
-          See your nonprofit through an attacker's eyes
-        </div>
+      {/* ── Hero ── */}
+      <ShieldHero />
 
-        <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl">
-          What can a stranger{" "}
-          <span className="bg-gradient-to-r from-risk-high to-accent-400 bg-clip-text text-transparent">
-            harvest
-          </span>{" "}
-          from your website?
-        </h1>
+      <h1
+        className="text-center"
+        style={{ fontSize: "clamp(38px, 7vw, 56px)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.05 }}
+      >
+        Protect what matters.
+      </h1>
+      <p
+        className="mt-4 max-w-[34rem] text-center"
+        style={{ fontSize: 21, fontWeight: 400, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.55)" }}
+      >
+        Scan any domain for breaches, leaks, and active threats in seconds.
+      </p>
 
-        <p className="mt-5 max-w-md text-[15px] leading-relaxed text-muted">
-          Enter your domain once. Aegis crawls your public pages for staff emails, names and phone
-          numbers, checks them against known breaches, tests whether your domain can be spoofed, and
-          audits the code your site ships — then tells you, in plain English, the risks and exactly
-          what to do next.
+      {/* ── Liquid Glass form card ── */}
+      <div className="card card-glow mt-12 w-full p-7" style={{ maxWidth: 520 }}>
+        <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Your project portal</h2>
+        <p className="mt-1" style={{ fontSize: 15, color: "rgba(255,255,255,0.55)" }}>
+          We only read public pages. Nothing is stored.
         </p>
 
-        {/* Decorative cyber shield */}
-        <CyberShield />
-      </div>
-
-      {/* Right — glass form card */}
-      <div className="card card-glow p-7">
-        <h2 className="text-xl font-semibold">Your project portal</h2>
-        <p className="mt-1 text-sm text-muted">We only read public pages. Nothing is stored.</p>
-
-        <div className="mt-6 space-y-4">
+        <div className="mt-7 space-y-5">
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-muted">Website domain</span>
+            <span className={labelClass}>Website domain</span>
             <input
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && onSubmit()}
               placeholder="aylus.org"
-              className="bd-input"
+              className="p-form-text"
+              style={{ width: "100%" }}
               autoFocus
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-muted">
-              Organization name <span className="text-muted/60">(optional)</span>
+            <span className={labelClass}>
+              Organization name <span className="normal-case tracking-normal text-white/25">(optional)</span>
             </span>
             <input
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && onSubmit()}
               placeholder="American Youth Leadership"
-              className="bd-input"
+              className="p-form-text"
+              style={{ width: "100%" }}
             />
           </label>
         </div>
 
         {error && (
-          <div className="mt-4 rounded-xl border border-risk-high/30 bg-risk-crit/10 px-3 py-2.5 text-xs text-risk-high">
+          <div
+            className="mt-4 rounded-xl px-3 py-2.5 text-[13px]"
+            style={{ background: "rgba(255,69,58,0.12)", border: "1px solid rgba(255,69,58,0.3)", color: "#ff453a" }}
+          >
             {error}
           </div>
         )}
@@ -407,22 +310,29 @@ function InputView(props: {
         <button
           onClick={onSubmit}
           disabled={!canSubmit}
-          className="mt-6 w-full rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 py-3 font-semibold text-white shadow-lg shadow-brand-600/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`p-btn p-prim-col p-btn-block ${!canSubmit ? "p-btn-disabled" : ""}`}
+          style={{ width: "100%", margin: "1.75rem 0 0", fontSize: 17, fontWeight: 600 }}
         >
           Run breach scan →
         </button>
         <button
           onClick={onExample}
-          className="mt-3 w-full text-center text-xs text-muted underline-offset-4 hover:text-brand-300 hover:underline"
+          className="mt-3 w-full text-center"
+          style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}
         >
           Try it with aylus.org
         </button>
 
-        {/* Trust badges */}
-        <div className="mt-5 flex items-center justify-center gap-4 border-t border-white/[0.06] pt-4">
-          {["🔒 No data stored", "🌐 Public pages only", "⚡ AI-powered"].map((b) => (
-            <span key={b} className="text-[11px] text-muted">{b}</span>
-          ))}
+        {/* Trust row */}
+        <div
+          className="mt-6 flex items-center justify-center gap-3 pt-5"
+          style={{ borderTop: "0.5px solid rgba(255,255,255,0.1)", fontSize: 13, color: "rgba(255,255,255,0.55)" }}
+        >
+          <span className="inline-flex items-center gap-1.5"><TrustIcon name="lock" /> No data stored</span>
+          <span className="text-white/20">·</span>
+          <span className="inline-flex items-center gap-1.5"><TrustIcon name="globe" /> Public pages only</span>
+          <span className="text-white/20">·</span>
+          <span className="inline-flex items-center gap-1.5"><TrustIcon name="bolt" /> AI-powered</span>
         </div>
       </div>
     </motion.div>
@@ -452,11 +362,14 @@ function ScanningView({ step, domain }: { step: number; domain: string }) {
         ))}
         <div className="absolute inset-0 grid place-items-center">
           <motion.div
-            className="grid h-20 w-20 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-accent-500 text-3xl shadow-xl shadow-brand-600/40"
+            className="grid h-20 w-20 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-accent-500 shadow-xl shadow-brand-600/40"
             animate={{ rotate: [0, 6, -6, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            🔍
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
           </motion.div>
         </div>
       </div>
@@ -495,11 +408,11 @@ function ScanningView({ step, domain }: { step: number; domain: string }) {
 type ReportTab = "found" | "risks" | "action";
 
 const DEMOGRAPHICS = [
-  { id: "all",        label: "Everyone",        icon: "👥", color: "#818cf8" },
-  { id: "leadership", label: "Leadership / ED", icon: "🏛️", color: "#f43f5e" },
-  { id: "it",         label: "IT Admin",        icon: "💻", color: "#a3e635" },
-  { id: "staff",      label: "Staff",           icon: "👤", color: "#fbbf24" },
-  { id: "volunteers", label: "Volunteers",      icon: "🤝", color: "#34d399" },
+  { id: "all",        label: "Everyone",        color: "#0a84ff" },
+  { id: "leadership", label: "Leadership / ED", color: "#ff453a" },
+  { id: "it",         label: "IT Admin",        color: "#64d2ff" },
+  { id: "staff",      label: "Staff",           color: "#ffd60a" },
+  { id: "volunteers", label: "Volunteers",      color: "#30d158" },
 ] as const;
 
 type DemoId = typeof DEMOGRAPHICS[number]["id"];
@@ -558,10 +471,10 @@ function getDemoCallout(title: string, steps: string[], demo: DemoId): string | 
   return demoMap.default;
 }
 
-const REPORT_TABS: { id: ReportTab; label: string; icon: string }[] = [
-  { id: "found",  label: "What We Found",        icon: "🔍" },
-  { id: "risks",  label: "Risks & Who's at Risk", icon: "⚠️" },
-  { id: "action", label: "Step-by-Step Action",   icon: "⚡" },
+const REPORT_TABS: { id: ReportTab; label: string }[] = [
+  { id: "found",  label: "What We Found" },
+  { id: "risks",  label: "Risks & Who's at Risk" },
+  { id: "action", label: "Step-by-Step Action" },
 ];
 
 function ReportView(props: {
@@ -619,7 +532,7 @@ function ReportView(props: {
 
       {lookup.source === "error" && crawl.emails.length > 0 && (
         <div className="rounded-lg border border-risk-med/30 bg-risk-med/10 px-3 py-2 text-xs text-risk-med">
-          ⚠ We couldn't reach the breach database, so the emails below{" "}
+          We couldn't reach the breach database, so the emails below{" "}
           <span className="font-semibold">weren't checked</span>. Check your connection and rescan.
         </div>
       )}
@@ -645,14 +558,13 @@ function ReportView(props: {
               style={
                 active
                   ? isAction
-                    ? { background: "linear-gradient(135deg, #e11d48, #f97316)", color: "#fff", boxShadow: "0 2px 18px rgba(225,29,72,0.45)" }
-                    : { background: "linear-gradient(135deg, #4f46e5, #65a30d)", color: "#fff", boxShadow: "0 2px 12px rgba(99,102,241,0.35)" }
+                    ? { background: "linear-gradient(135deg, #ff453a, #ff9f0a)", color: "#fff", boxShadow: "0 2px 18px rgba(225,29,72,0.45)" }
+                    : { background: "linear-gradient(135deg, #0a84ff, #32ade6)", color: "#fff", boxShadow: "0 2px 12px rgba(99,102,241,0.35)" }
                   : isAction
                     ? { color: "#fb7185", border: "1px solid rgba(244,63,94,0.40)", background: "rgba(244,63,94,0.10)" }
                     : { color: "var(--color-muted)" }
               }
             >
-              <span className="text-base leading-none">{t.icon}</span>
               <span className="hidden sm:inline">{t.label}</span>
               <span className="sm:hidden text-xs">{t.label.split(" ")[0]}</span>
               {/* Pulsing dot on inactive action tab */}
@@ -705,8 +617,8 @@ function ReportView(props: {
 
               {(crawl.names.length > 0 || crawl.phones.length > 0) && (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {crawl.names.length  > 0 && <Chips title="Names found"         items={crawl.names}  icon="👤" />}
-                  {crawl.phones.length > 0 && <Chips title="Phone numbers found" items={crawl.phones} icon="📞" />}
+                  {crawl.names.length  > 0 && <Chips title="Names found"         items={crawl.names} />}
+                  {crawl.phones.length > 0 && <Chips title="Phone numbers found" items={crawl.phones} />}
                 </div>
               )}
             </div>
@@ -808,7 +720,10 @@ function ReportView(props: {
                           : { color: "var(--color-muted)", border: "1px solid rgba(255,255,255,0.08)" }
                       }
                     >
-                      <span>{d.icon}</span>
+                      <span
+                        className="inline-block h-2 w-2 flex-none rounded-full"
+                        style={{ background: d.color }}
+                      />
                       <span>{d.label}</span>
                     </button>
                   );
@@ -851,7 +766,7 @@ function ReportView(props: {
                       <summary className="flex cursor-pointer list-none items-center gap-3">
                         <span
                           className="grid h-7 w-7 flex-none place-items-center rounded-full text-sm font-bold text-white"
-                          style={{ background: "linear-gradient(135deg, #e11d48, #f97316)" }}
+                          style={{ background: "linear-gradient(135deg, #ff453a, #ff9f0a)" }}
                         >
                           {i + 1}
                         </span>
@@ -871,7 +786,10 @@ function ReportView(props: {
                             className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
                             style={{ background: demo.color + "1a", border: `1px solid ${demo.color}45` }}
                           >
-                            <span className="mt-0.5 text-base">{demo.icon}</span>
+                            <span
+                              className="mt-1.5 inline-block h-2 w-2 flex-none rounded-full"
+                              style={{ background: demo.color }}
+                            />
                             <div>
                               <div
                                 className="text-[11px] font-bold uppercase tracking-widest mb-0.5"
@@ -1060,9 +978,9 @@ function JsFindingRow({ f }: { f: JsFinding }) {
 }
 
 const DSEC_META = {
-  pass: { icon: "🟢", color: "var(--color-risk-low)", bg: "rgba(52,211,153,0.12)", label: "OK" },
-  warn: { icon: "🟡", color: "var(--color-risk-med)", bg: "rgba(251,191,36,0.12)", label: "Weak" },
-  fail: { icon: "🔴", color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)", label: "Missing" },
+  pass: { color: "var(--color-risk-low)", bg: "rgba(52,211,153,0.12)", label: "OK" },
+  warn: { color: "var(--color-risk-med)", bg: "rgba(251,191,36,0.12)", label: "Weak" },
+  fail: { color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)", label: "Missing" },
 } as const;
 
 function DomainSecurityCard({ sec }: { sec: DomainSecurity }) {
@@ -1095,7 +1013,7 @@ function DomainSecurityCard({ sec }: { sec: DomainSecurity }) {
             <div key={c.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span>{m.icon}</span>
+                  <span className="inline-block h-2.5 w-2.5 flex-none rounded-full" style={{ background: m.color }} />
                   <span className="font-semibold">{c.label}</span>
                   <span className="text-sm text-fg/85">— {c.title}</span>
                 </div>
@@ -1147,7 +1065,7 @@ function WebSecurityCard({ sec }: { sec: WebSecurity }) {
             <div key={c.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span>{m.icon}</span>
+                  <span className="inline-block h-2.5 w-2.5 flex-none rounded-full" style={{ background: m.color }} />
                   <span className="font-semibold">{c.label}</span>
                   <span className="text-sm text-fg/85">— {c.title}</span>
                 </div>
@@ -1198,7 +1116,7 @@ function ReputationCard({ rep }: { rep: Reputation }) {
             <div key={c.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span>{m.icon}</span>
+                  <span className="inline-block h-2.5 w-2.5 flex-none rounded-full" style={{ background: m.color }} />
                   <span className="font-semibold">{c.label}</span>
                   <span className="text-sm text-fg/85">— {c.title}</span>
                 </div>
@@ -1231,7 +1149,10 @@ function EmailRow({ r }: { r: EmailBreach }) {
   return (
     <details className="group rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3">
       <summary className="flex cursor-pointer list-none items-center gap-3">
-        <span className="text-base">{breached ? "🔴" : err ? "⚪" : "🟢"}</span>
+        <span
+          className="inline-block h-2.5 w-2.5 flex-none rounded-full"
+          style={{ background: breached ? "var(--color-risk-crit)" : err ? "rgba(255,255,255,0.3)" : "var(--color-risk-low)" }}
+        />
         <span className="flex-1 truncate font-mono text-sm">{r.email}</span>
         <span
           className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
@@ -1269,11 +1190,11 @@ function EmailRow({ r }: { r: EmailBreach }) {
   );
 }
 
-function Chips({ title, items, icon }: { title: string; items: string[]; icon: string }) {
+function Chips({ title, items }: { title: string; items: string[] }) {
   return (
     <div className="rounded-xl border border-white/8 bg-white/[0.025] p-4">
       <div className="mb-2 text-xs font-medium text-muted">
-        {icon} {title} ({items.length})
+        {title} ({items.length})
       </div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((it) => (

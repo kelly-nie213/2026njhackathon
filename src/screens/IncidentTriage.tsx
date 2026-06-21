@@ -184,7 +184,8 @@ export default function IncidentTriage() {
                   <button
                     onClick={advance}
                     disabled={selected.length === 0}
-                    className="rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 px-5 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-40"
+                    className="p-btn p-prim-col"
+                    style={{ margin: 0 }}
                   >
                     Continue →
                   </button>
