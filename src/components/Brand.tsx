@@ -29,7 +29,7 @@ export function Brand({ size = 28 }: { size?: number }) {
         <div className="text-lg font-bold tracking-tight bg-gradient-to-r from-brand-300 via-brand-400 to-accent-400 bg-clip-text text-transparent">
           Aegis
         </div>
-        <div className="text-[11px] text-muted">Cyber Health for Nonprofits</div>
+        <div className="text-[11px] text-muted">Cyber Health for Nonprofits & Small Businesses</div>
       </div>
     </div>
   );

@@ -85,7 +85,7 @@ export default function IncidentTriage() {
   const runAi = async () => {
     if (!result) return;
     setLoading(true);
-    const guide = await generateRecovery(describe(answers), result, "a small nonprofit");
+    const guide = await generateRecovery(describe(answers), result, "a small nonprofit or business");
     setRecovery(guide);
     setLoading(false);
   };

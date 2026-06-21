@@ -8,7 +8,7 @@ import { Nav } from "../components/Nav";
 ════════════════════════════════════════ */
 
 const STATS = [
-  { num: 68,   decimals: 0, prefix: "",  suffix: "%",  label: "of nonprofits experienced a cyberattack or breach" },
+  { num: 68,   decimals: 0, prefix: "",  suffix: "%",  label: "of nonprofits and small businesses experienced a cyberattack or breach" },
   { num: 1.54, decimals: 2, prefix: "$", suffix: "M",  label: "average ransomware payment in 2023" },
   { num: 277,  decimals: 0, prefix: "",  suffix: "",   label: "days average time to detect a breach" },
   { num: 88,   decimals: 0, prefix: "",  suffix: "%",  label: "of all breaches start with human error" },
@@ -87,7 +87,7 @@ const PILLARS: Pillar[] = [
     title: "Lack of Robust Backups",
     severity: "critical",
     stat: "3-2-1",
-    statLabel: "the backup rule almost no nonprofit actually follows",
+    statLabel: "the backup rule almost no nonprofit or small business actually follows",
     what: "Ransomware encrypts everything it can reach — including cloud folders synced to an infected computer. Without an offline or air-gapped backup, you pay the ransom or lose everything permanently. The 3-2-1 rule: 3 copies of data, on 2 different media types, with 1 stored offsite or offline.",
     scenario: "Ransomware executes at 11pm on a Friday. By Saturday morning, your donor list, grant history, financial records, and program files are encrypted. Your cloud backup synced automatically — and is also encrypted. Without a clean offline backup, you face paying $50,000–$500,000 or rebuilding from scratch.",
     connectedTo: [5, 6],
@@ -114,7 +114,7 @@ const PILLARS: Pillar[] = [
       "Enable Cloudflare Gateway (free) as a DNS firewall to block known malicious domains",
     ],
     quickWin: "Enable Microsoft Defender on every Windows machine right now via Windows Security settings. It's already installed and just needs to be turned on.",
-    deepDive: "Endpoint Detection & Response (EDR) tools go beyond traditional antivirus by watching for suspicious behavior rather than just known malware signatures. Products like Microsoft Defender for Business ($3/user/month) are affordable for nonprofits and provide enterprise-grade protection. The Cybersecurity and Infrastructure Security Agency (CISA) offers free cybersecurity resources specifically for nonprofits.",
+    deepDive: "Endpoint Detection & Response (EDR) tools go beyond traditional antivirus by watching for suspicious behavior rather than just known malware signatures. Products like Microsoft Defender for Business ($3/user/month) are affordable for nonprofits and small businesses and provide enterprise-grade protection. The Cybersecurity and Infrastructure Security Agency (CISA) offers free cybersecurity resources specifically for nonprofits and small businesses.",
   },
   {
     id: 6,
@@ -145,9 +145,9 @@ const PILLARS: Pillar[] = [
     tips: [
       "Run a free simulated phishing test with your team (KnowBe4 offers a free phishing security test)",
       "Establish a hard 'call to verify' rule: any financial request received via email must be confirmed by phone before action",
-      "Run a 30-minute security awareness session quarterly — real examples from recent nonprofit attacks are more memorable than abstract theory",
+      "Run a 30-minute security awareness session quarterly — real examples from recent nonprofit and small business attacks are more memorable than abstract theory",
     ],
-    quickWin: "Send your team one real-world phishing example this week (search 'nonprofit BEC phishing example') with an explanation of what makes it suspicious. Then establish the 'call to verify' rule for all financial requests.",
+    quickWin: "Send your team one real-world phishing example this week (search 'small business BEC phishing example') with an explanation of what makes it suspicious. Then establish the 'call to verify' rule for all financial requests.",
     deepDive: "Business Email Compromise (BEC) attacks cost $2.7 billion in 2022 alone — more than ransomware. They require zero technical sophistication: an attacker registers a look-alike domain or hacks a real email account and simply asks for money or data. The only defense is a trained human who pauses, questions, and verifies by phone before acting.",
   },
 ];
@@ -168,7 +168,7 @@ const ORG_TIPS = [
   { tip: "Map your data", detail: "Know where donor PII lives: which databases, cloud drives, spreadsheets", icon: "map" },
   { tip: "Upgrade to Microsoft 365 or Google Workspace", detail: "Built-in email filtering, MFA, device management — worth every dollar", icon: "building" },
   { tip: "Write a one-page incident response plan", detail: "Who to call, what to do first, who has authority to act — before you need it", icon: "doc" },
-  { tip: "Get cyber insurance", detail: "Many nonprofits qualify for affordable policies that cover breach response costs", icon: "shield" },
+  { tip: "Get cyber insurance", detail: "Many nonprofits and small businesses qualify for affordable policies that cover breach response costs", icon: "shield" },
   { tip: "Quarterly security check-in", detail: "30-minute team meeting: review recent phishing examples and remind of procedures", icon: "calendar" },
   { tip: "Enforce MFA org-wide", detail: "Require it in your Google/Microsoft admin console — not optional", icon: "key" },
   { tip: "Test your backups", detail: "Quarterly fire drill: restore a file from backup to prove it actually works", icon: "refresh" },
@@ -199,7 +199,7 @@ const QUIZ: QuizQ[] = [
       { label: "D", text: "Google the vendor to check if they exist, then send" },
     ],
     correct: "C",
-    explanation: "Email can be hacked or spoofed. Always verify financial requests by phone on a number you already have — never one from the email. This is Business Email Compromise (BEC), the #1 nonprofit fraud.",
+    explanation: "Email can be hacked or spoofed. Always verify financial requests by phone on a number you already have — never one from the email. This is Business Email Compromise (BEC), the #1 fraud targeting nonprofits and small businesses.",
   },
   {
     id: 2,
@@ -882,7 +882,7 @@ export default function LearnMore() {
         >
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-3 py-1 text-xs font-medium text-accent-400">
             <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
-            Nonprofit Cyber Defense Education
+            Nonprofit & Small Business Cyber Defense
           </div>
 
           <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
@@ -967,7 +967,7 @@ export default function LearnMore() {
                       <div>
                         <div className="text-sm font-semibold text-fg">{t.label}</div>
                         <div className="mt-0.5 text-xs text-muted">
-                          {t.id === "pillars"  && "The 7 most exploited nonprofit vulnerabilities — click any to expand"}
+                          {t.id === "pillars"  && "The 7 most exploited nonprofit and small business vulnerabilities — click any to expand"}
                           {t.id === "personal" && "8 actions every individual should take — check them off as you go"}
                           {t.id === "org"      && "Process & policy improvements with an interactive checklist"}
                           {t.id === "quiz"     && "5 scenario-based questions — see how your team would handle a real attack"}
@@ -1120,7 +1120,7 @@ export default function LearnMore() {
                 </div>
                 <h2 className="mb-1 text-2xl font-bold tracking-tight">How would your team respond?</h2>
                 <p className="text-sm text-muted">
-                  Real scenarios nonprofit staff actually face. No trick questions — just practical judgment calls.
+                  Real scenarios nonprofit and small business staff actually face. No trick questions — just practical judgment calls.
                 </p>
               </div>
               <QuizTab />

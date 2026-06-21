@@ -259,7 +259,7 @@ app.post("/api/breach-report", async (req, res) => {
     const codeLines = codeSecurity
       ? `Website code audit (the JavaScript the site ships): ${codeSecurity.security || 0} security + ${codeSecurity.bug || 0} code-quality issue(s)` +
         (codeSecurity.top?.length ? `. Examples: ${codeSecurity.top.join("; ")}` : "") +
-        ". Note many findings are in third-party widgets the nonprofit can't edit directly."
+        ". Note many findings are in third-party widgets the organization can't edit directly."
       : "Website code audit: no issues (or not run)";
     const result = await client.messages.create({
       model: MODEL,
@@ -267,7 +267,7 @@ app.post("/api/breach-report", async (req, res) => {
       thinking: { type: "adaptive" },
       output_config: { effort: "medium", format: { type: "json_schema", schema: BREACH_REPORT_SCHEMA } },
       system:
-        "You advise small nonprofits with no IT staff. A scan of their public website found staff emails, " +
+        "You advise small nonprofits and businesses with no IT staff. A scan of their public website found staff emails, " +
         "names and phone numbers, checked those emails against known data breaches, checked via live DNS " +
         "whether the domain can be spoofed in email (SPF/DMARC/DKIM), checked the site's TLS certificate and " +
         "HTTP security headers (CSP/HSTS/X-Frame-Options, etc.), and statically scanned the JavaScript the site ships. " +
@@ -329,7 +329,7 @@ app.post("/api/triage", async (req, res) => {
       thinking: { type: "adaptive" },
       output_config: { effort: "medium", format: { type: "json_schema", schema: TRIAGE_SCHEMA } },
       system:
-        "You are a calm incident responder helping a panicking volunteer at a small nonprofit that has no IT staff. " +
+        "You are a calm incident responder helping a panicking volunteer at a small nonprofit or business that has no IT staff. " +
         "Someone may have just fallen for a scam. Give clear, ordered, plain-language recovery steps they can do right now — " +
         "most urgent and time-sensitive first (stopping money movement and locking accounts before anything else). " +
         "Be reassuring but honest about what's reversible. No jargon, no blame. Write a short calming summary (2-3 sentences) and 4-7 concrete steps.",
@@ -337,7 +337,7 @@ app.post("/api/triage", async (req, res) => {
         {
           role: "user",
           content:
-            `Organization: ${orgName || "a small nonprofit"}.\n` +
+            `Organization: ${orgName || "a small nonprofit or business"}.\n` +
             `Assessed severity: ${severity}. ${reversibility}\n\n` +
             `What happened:\n${situation}`,
         },
@@ -364,7 +364,7 @@ app.post("/api/phishing", async (req, res) => {
       thinking: { type: "adaptive" },
       output_config: { effort: "medium", format: { type: "json_schema", schema: PHISHING_SCHEMA } },
       system:
-        "You are a cybersecurity analyst protecting a small nonprofit that has no IT staff. " +
+        "You are a cybersecurity analyst protecting a small nonprofit or business that has no IT staff. " +
         "You assess whether a message is an AI-generated phishing / social-engineering attempt " +
         "(fake donation requests, vendor-payment redirection, CEO/board impersonation, fake volunteer messages). " +
         "Be decisive but fair. Write every field in plain language a non-technical volunteer can act on. " +
@@ -373,7 +373,7 @@ app.post("/api/phishing", async (req, res) => {
         {
           role: "user",
           content:
-            `Organization: ${orgName || "a small nonprofit"}\n\n` +
+            `Organization: ${orgName || "a small nonprofit or business"}\n\n` +
             `Analyze this message they received:\n\n"""\n${message.slice(0, 8000)}\n"""`,
         },
       ],
@@ -389,7 +389,7 @@ app.post("/api/phishing", async (req, res) => {
 // Guided plan + free-form follow-ups, tailored to the person's role/comfort/budget.
 function formatScanContext(ctx = {}, profile = {}) {
   const lines = [];
-  lines.push(`Organization: ${ctx.orgName || ctx.domain || "a small nonprofit"} (domain ${ctx.domain || "unknown"}).`);
+  lines.push(`Organization: ${ctx.orgName || ctx.domain || "a small nonprofit or business"} (domain ${ctx.domain || "unknown"}).`);
   if (profile.role || profile.comfort || profile.budget) {
     lines.push(
       `About the person asking: role = ${profile.role || "unspecified"}; ` +
@@ -448,7 +448,7 @@ app.post("/api/advisor", async (req, res) => {
       thinking: { type: "adaptive" },
       output_config: { effort: "low" },
       system:
-        "You are Aegis, a calm, encouraging cybersecurity advisor for a small nonprofit that has no IT staff. " +
+        "You are Aegis, a calm, encouraging cybersecurity advisor for a small nonprofit or business that has no IT staff. " +
         "You are given the real results of a security scan of their website plus some context about the person asking. " +
         "Give specific, prioritized, plain-language advice tailored to THEIR actual findings and THEIR situation " +
         "(role, tech comfort, budget). Always ground answers in the scan results below — reference the specific findings. " +

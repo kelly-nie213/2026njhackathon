@@ -50,7 +50,7 @@ export default function PhishingChecker() {
     if (!text.trim()) return;
     setLoading(true);
     setResult(null);
-    const verdict = await analyzePhishing(text, "a small nonprofit");
+    const verdict = await analyzePhishing(text, "a small nonprofit or business");
     setResult(verdict);
     setLoading(false);
   };
