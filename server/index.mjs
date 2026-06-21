@@ -91,7 +91,7 @@ const BREACH_REPORT_SCHEMA = {
 };
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, ai: hasKey, breaches: "xposedornot" });
+  res.json({ ok: true, ai: hasKey, breaches: "leakcheck" });
 });
 
 /* ───────────────────── verifiable security-health badge ─────────────────── */
@@ -469,6 +469,6 @@ app.listen(PORT, () => {
   console.log(
     `[aegis-api] listening on http://localhost:${PORT}  ` +
       `(AI ${hasKey ? "enabled" : "disabled — set ANTHROPIC_API_KEY"}; ` +
-      `breach lookups via XposedOrNot — no key needed)`
+      `breach lookups via LeakCheck — no key needed)`
   );
 });
