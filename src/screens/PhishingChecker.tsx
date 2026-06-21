@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brand } from "../components/Brand";
+import { Nav } from "../components/Nav";
 import { analyzePhishing, type PhishingVerdict } from "../lib/api";
 
 const SAMPLE = `From: Pastor David Reyes <d.reyes@grace-foodbank.com>
@@ -16,13 +15,33 @@ const VERDICT_META: Record<
   PhishingVerdict["verdict"],
   { label: string; color: string; bg: string; icon: string }
 > = {
-  likely_phishing: { label: "Likely phishing", color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)", icon: "🚨" },
-  suspicious: { label: "Suspicious", color: "var(--color-risk-med)", bg: "rgba(251,191,36,0.14)", icon: "⚠️" },
-  likely_safe: { label: "Likely safe", color: "var(--color-risk-low)", bg: "rgba(52,211,153,0.14)", icon: "✓" },
+  likely_phishing: { label: "Likely phishing", color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)",  icon: "🚨" },
+  suspicious:      { label: "Suspicious",      color: "var(--color-risk-med)",  bg: "rgba(251,191,36,0.14)", icon: "⚠️" },
+  likely_safe:     { label: "Likely safe",     color: "var(--color-risk-low)",  bg: "rgba(52,211,153,0.14)", icon: "✓"  },
 };
 
+/* ── Decorative mail-shield SVG ── */
+function MailShieldIcon() {
+  return (
+    <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="mg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stopColor="#818cf8" />
+          <stop offset="100%" stopColor="#a3e635" />
+        </linearGradient>
+      </defs>
+      {/* Envelope */}
+      <rect x="5" y="12" width="28" height="20" rx="3" fill="url(#mg)" opacity="0.22" stroke="url(#mg)" strokeWidth="1.5"/>
+      <path d="M5 15 L19 23 L33 15" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
+      {/* Shield badge */}
+      <path d="M34 24 L28 27 L28 33 Q28 37 34 39 Q40 37 40 33 L40 27 Z"
+        fill="#6366f1" opacity="0.9"/>
+      <path d="M31.5 32 L33 33.5 L36.5 30" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 export default function PhishingChecker() {
-  const nav = useNavigate();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PhishingVerdict | null>(null);
@@ -37,31 +56,28 @@ export default function PhishingChecker() {
   };
 
   return (
-    <div className="bg-aurora min-h-full pb-16">
-      <header className="border-b border-white/8">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Brand />
-          <button
-            onClick={() => nav("/")}
-            className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
-          >
-            ← Back
-          </button>
-        </div>
-      </header>
+    <div className="min-h-full pb-16">
+      <Nav />
 
       <main className="mx-auto max-w-4xl px-6 pt-8">
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> AI phishing analyzer
+        {/* Page header */}
+        <div className="mb-6">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> AI phishing analyzer
+          </div>
+          <div className="flex items-center gap-3">
+            <MailShieldIcon />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Is this message a scam?</h1>
+              <p className="mt-0.5 text-sm text-muted">
+                Paste a suspicious email or text. AI checks it for hallmarks of social-engineering attacks.
+              </p>
+            </div>
+          </div>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">Is this message a scam?</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          Paste a suspicious email or text — a donation request, a vendor invoice, a message
-          that looks like it's from your director. AI checks it for the hallmarks of an
-          AI-generated attack and tells you, in plain English, what to do.
-        </p>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Input card */}
           <div className="card p-5">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-medium text-muted">Paste the message</span>
@@ -76,8 +92,8 @@ export default function PhishingChecker() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={12}
-              placeholder="From: ...&#10;Subject: ...&#10;&#10;Paste the full message here"
-              className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] p-3 font-mono text-[13px] leading-relaxed text-fg outline-none focus:border-brand-400"
+              placeholder={"From: ...\nSubject: ...\n\nPaste the full message here"}
+              className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] p-3 font-mono text-[13px] leading-relaxed text-fg outline-none focus:border-brand-400 transition"
             />
             <button
               onClick={run}
@@ -88,6 +104,7 @@ export default function PhishingChecker() {
             </button>
           </div>
 
+          {/* Result card */}
           <div className="card p-5">
             <span className="text-xs font-medium text-muted">Analysis</span>
 
@@ -100,20 +117,31 @@ export default function PhishingChecker() {
                   exit={{ opacity: 0 }}
                   className="mt-8 flex flex-col items-center gap-3 text-sm text-muted"
                 >
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-brand-400" />
+                  <div className="relative h-10 w-10">
+                    <div className="absolute inset-0 animate-spin rounded-full border-2 border-white/10 border-t-brand-400" />
+                    <div className="absolute inset-1 animate-spin rounded-full border border-white/5 border-b-accent-400"
+                      style={{ animationDirection: "reverse", animationDuration: "0.6s" }} />
+                  </div>
                   Reading it the way an attacker would…
                 </motion.div>
               )}
 
               {!loading && !result && (
-                <motion.p
+                <motion.div
                   key="empty"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="mt-8 text-center text-sm text-muted"
+                  className="mt-10 flex flex-col items-center gap-4 text-center"
                 >
-                  Your verdict, red flags, and next step will appear here.
-                </motion.p>
+                  {/* Placeholder graphic */}
+                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" opacity="0.25">
+                    <circle cx="32" cy="32" r="30" stroke="#8b5cf6" strokeWidth="1.5" strokeDasharray="6 8"/>
+                    <path d="M32 18 L44 26 L44 38 Q44 50 32 54 Q20 50 20 38 L20 26 Z"
+                      fill="#8b5cf6" opacity="0.5"/>
+                    <path d="M26 34 L30 38 L38 28" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <p className="text-sm text-muted">Your verdict, red flags, and next step will appear here.</p>
+                </motion.div>
               )}
 
               {!loading && result && (
@@ -161,7 +189,9 @@ export default function PhishingChecker() {
                   </div>
 
                   <div className="text-right text-[11px] text-muted">
-                    {result.source === "ai" ? "Analyzed by Claude" : "Offline heuristic (add an API key for full AI analysis)"}
+                    {result.source === "ai"
+                      ? "✦ Analyzed by Claude"
+                      : "Offline heuristic (add an API key for full AI analysis)"}
                   </div>
                 </motion.div>
               )}
