@@ -51,12 +51,18 @@ export default function Onboarding() {
         <Brand />
         <div className="flex items-center gap-3">
           <button
+            onClick={() => nav("/learn")}
+            className="rounded-full border border-brand-500/40 bg-brand-500/10 px-5 py-2 text-sm font-medium text-brand-300 transition hover:bg-brand-500/20"
+          >
+            📚 Learn & Prevent
+          </button>
+          <button
             onClick={() => nav("/triage")}
-            className="rounded-full border border-risk-high/40 bg-risk-crit/10 px-3 py-1 text-xs font-medium text-risk-high transition hover:bg-risk-crit/20"
+            className="rounded-full border border-risk-high/40 bg-risk-crit/10 px-5 py-2 text-sm font-medium text-risk-high transition hover:bg-risk-crit/20"
           >
             ⚑ Something already happened?
           </button>
-          <span className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-muted sm:inline">
+          <span className="hidden rounded-full border border-white/10 px-5 py-2 text-sm font-medium text-muted sm:inline">
             Free • No software to install
           </span>
         </div>
@@ -69,9 +75,14 @@ export default function Onboarding() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-            Built for organizations without an IT team
+          <div className="mb-5">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
+              <span className="text-brand-400">★</span> Our Team Motto
+            </div>
+            <p className="text-2xl font-extrabold leading-snug"
+              style={{ background: "linear-gradient(90deg, #c4b5fd 0%, #60a5fa 50%, #34d399 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+              Protecting the Organizations that Protect Our Communities
+            </p>
           </div>
           <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl">
             Find out what an{" "}
