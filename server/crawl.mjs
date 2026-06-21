@@ -1,10 +1,16 @@
-// BreachDetector crawler — fetches a handful of public pages on a domain and
-// extracts the kind of personal data an attacker would harvest first: staff
-// emails, personal names and phone numbers. Runs server-side (no browser CORS
-// limits) and never logs in or touches anything non-public.
+// BreachDetector crawler — walks the WHOLE public site (breadth-first, following
+// links found on every page, not just the homepage) and extracts the kind of
+// personal data an attacker would harvest first: staff emails, personal names
+// and phone numbers. Runs server-side (no browser CORS limits) and never logs
+// in or touches anything non-public.
 
 const FETCH_TIMEOUT_MS = 9000;
-const MAX_PAGES = 6;
+// Safety rails so a giant site (e.g. a blog with thousands of posts) can't run
+// forever: stop after MAX_PAGES pages OR once the overall time budget is spent.
+const MAX_PAGES = 200;
+const TIME_BUDGET_MS = 60000;
+// Pages fetched in parallel each wave — faster crawl without hammering the host.
+const CONCURRENCY = 6;
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 BreachDetector/1.0";
@@ -46,6 +52,7 @@ const NAME_STOPWORDS = new Set(
     "college", "university", "church", "ministry", "fund", "trust", "group", "inc",
     "llc", "department", "office", "mission", "vision", "history", "story", "stories",
     "support", "donors", "donor", "sponsor", "sponsors", "partner", "partners",
+    "president", "vice", "student", "students", "junior", "senior", "org", "gmail",
     "january", "february", "march", "april", "may", "june", "july", "august",
     "september", "october", "november", "december", "monday", "tuesday",
     "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -113,6 +120,8 @@ function nameFromEmail(email) {
   // first.last / first_last / first-last
   const parts = local.split(/[._\-]/).filter((p) => /^[a-z]{2,}$/i.test(p));
   if (parts.length >= 2 && parts.length <= 3) {
+    // Drop org-ish locals like "aylus.org" → "Aylus Org".
+    if (parts.some((p) => NAME_STOPWORDS.has(p.toLowerCase()))) return null;
     return parts.map((p) => p[0].toUpperCase() + p.slice(1)).join(" ");
   }
   return null;
@@ -165,10 +174,28 @@ function extractLinks(html, base) {
   return [...links];
 }
 
+/** Priority score so high-value pages (contact/team/board) get crawled first. */
+function score(href) {
+  const path = href.toLowerCase();
+  return PRIORITY_HINTS.reduce((s, hint) => (path.includes(hint) ? s + 1 : s), 0);
+}
+
+/** Stable de-dup key for a URL: drop hash + query so we don't loop on ?utm= etc. */
+function pageKey(u) {
+  const url = new URL(u);
+  url.hash = "";
+  url.search = "";
+  // Treat "/path" and "/path/" as the same page.
+  if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, "");
+  return url.toString();
+}
+
 /**
- * Crawl up to MAX_PAGES public pages on `domain` and return the harvested data.
- * Best-effort: individual page failures are swallowed so one dead link can't
- * sink the whole scan.
+ * Crawl the entire public site at `domain` breadth-first — every page we fetch
+ * has its own links discovered and queued, so we reach sub-pages, sub-sub-pages
+ * and so on, not just the homepage. Bounded by MAX_PAGES and TIME_BUDGET_MS so
+ * it always terminates. Best-effort: individual page failures are swallowed so
+ * one dead link can't sink the whole scan.
  */
 export async function crawlDomain(domain) {
   const host = normalizeDomain(domain);
@@ -179,8 +206,13 @@ export async function crawlDomain(domain) {
   const emails = new Set();
   const names = new Set();
   const phones = new Set();
-  const visited = new Set();
   const pagesScanned = [];
+  const startedAt = Date.now();
+
+  // `seen` = every URL already visited OR queued (so we never enqueue twice).
+  const seen = new Set();
+  // `frontier` = URLs still waiting to be crawled.
+  const frontier = [];
 
   // Reach the live homepage (prefer https, fall back to www / http).
   let home;
@@ -208,36 +240,60 @@ export async function crawlDomain(domain) {
     for (const p of extractPhones(text)) phones.add(p);
   };
 
-  visited.add(home);
+  // Queue a link if it's on the same site, not an asset, and not seen before.
+  const enqueue = (href) => {
+    let key;
+    try {
+      const u = new URL(href);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return;
+      const h = u.hostname.replace(/^www\./, "");
+      if (!sameSite(h, baseHost)) return;
+      if (ASSET_EXT_RE.test(u.pathname)) return;
+      key = pageKey(href);
+    } catch {
+      return;
+    }
+    if (seen.has(key)) return;
+    seen.add(key);
+    frontier.push(key);
+  };
+
+  // Seed from the homepage (already fetched) and queue everything it links to.
+  seen.add(pageKey(home));
   pagesScanned.push(home);
   ingest(homeHtml);
+  for (const link of extractLinks(homeHtml, home)) enqueue(link);
 
-  // Pick the most promising same-site links to crawl next.
-  const candidates = extractLinks(homeHtml, home).filter((href) => {
-    try {
-      const h = new URL(href).hostname.replace(/^www\./, "");
-      return sameSite(h, baseHost) && !ASSET_EXT_RE.test(new URL(href).pathname);
-    } catch {
-      return false;
-    }
-  });
-  const ranked = candidates.sort((a, b) => score(b) - score(a));
+  // Breadth-first: each wave fetches up to CONCURRENCY pages in parallel and
+  // feeds their newly-discovered links back into the frontier.
+  while (
+    frontier.length > 0 &&
+    pagesScanned.length < MAX_PAGES &&
+    Date.now() - startedAt < TIME_BUDGET_MS
+  ) {
+    // Visit the most promising pages first.
+    frontier.sort((a, b) => score(b) - score(a));
+    const slots = Math.min(CONCURRENCY, MAX_PAGES - pagesScanned.length);
+    const batch = frontier.splice(0, slots);
 
-  for (const url of ranked) {
-    if (visited.size >= MAX_PAGES) break;
-    if (visited.has(url)) continue;
-    visited.add(url);
-    try {
-      const res = await timedFetch(url);
-      if (!res.ok) continue;
-      const ct = res.headers.get("content-type") || "";
-      if (!ct.includes("html")) continue;
-      const html = await res.text();
-      ingest(html);
-      pagesScanned.push(res.url);
-    } catch {
-      /* skip dead page */
-    }
+    await Promise.all(
+      batch.map(async (url) => {
+        try {
+          const res = await timedFetch(url);
+          if (!res.ok) return;
+          const ct = res.headers.get("content-type") || "";
+          if (!ct.includes("html")) return;
+          const html = await res.text();
+          ingest(html);
+          pagesScanned.push(res.url);
+          // Make sure a redirected URL isn't re-queued later.
+          seen.add(pageKey(res.url));
+          for (const link of extractLinks(html, res.url)) enqueue(link);
+        } catch {
+          /* skip dead/slow page */
+        }
+      })
+    );
   }
 
   // Derive additional names from the email local-parts we found.
@@ -253,9 +309,4 @@ export async function crawlDomain(domain) {
     names: [...names].sort(),
     phones: [...phones].sort(),
   };
-
-  function score(href) {
-    const path = href.toLowerCase();
-    return PRIORITY_HINTS.reduce((s, hint) => (path.includes(hint) ? s + 1 : s), 0);
-  }
 }

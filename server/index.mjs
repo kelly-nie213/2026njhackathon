@@ -136,8 +136,8 @@ app.post("/api/breaches", async (req, res) => {
     return res.status(400).json({ error: "emails_required" });
   }
   try {
-    // Cap to keep rate-limited live lookups sane.
-    const out = await checkEmails(emails.slice(0, 25));
+    // Cap high enough to cover a full crawl, low enough to bound run time.
+    const out = await checkEmails(emails.slice(0, 100));
     res.json(out);
   } catch (err) {
     console.error("breaches error:", err?.message || err);
