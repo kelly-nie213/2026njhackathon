@@ -89,29 +89,6 @@ const BREACH_REPORT_SCHEMA = {
   required: ["summary", "risks", "actions"],
 };
 
-const JS_REPORT_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    summary: { type: "string" },
-    recommendations: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          title: { type: "string" },
-          why: { type: "string" },
-          effort: { type: "string" },
-          steps: { type: "array", items: { type: "string" } },
-        },
-        required: ["title", "why", "effort", "steps"],
-      },
-    },
-  },
-  required: ["summary", "recommendations"],
-};
-
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, ai: hasKey, breaches: "xposedornot" });
 });
@@ -203,7 +180,7 @@ app.post("/api/reputation", async (req, res) => {
 // BreachDetector: turn raw exposure findings into risks + a plain-language plan.
 app.post("/api/breach-report", async (req, res) => {
   if (!client) return res.status(503).json({ error: "no_api_key" });
-  const { orgName, domain, emails, names, phones, breaches, domainSecurity, webSecurity, reputation } = req.body ?? {};
+  const { orgName, domain, emails, names, phones, breaches, domainSecurity, webSecurity, reputation, codeSecurity } = req.body ?? {};
   try {
     const breachLines = (breaches || [])
       .map((b) => `- ${b.email}: ${b.breachCount} breach(es)${b.breaches?.length ? ` (${b.breaches.map((x) => x.title).join(", ")})` : ""}`)
@@ -225,6 +202,11 @@ app.post("/api/breach-report", async (req, res) => {
         ? `Threat-intelligence reputation (live): FLAGGED — ${(reputation.hits || []).map((c) => `${c.label}: ${c.title}`).join("; ")}`
         : "Threat-intelligence reputation (live): not flagged on the sources checked"
       : "Threat-intelligence reputation: not checked";
+    const codeLines = codeSecurity
+      ? `Website code audit (the JavaScript the site ships): ${codeSecurity.security || 0} security + ${codeSecurity.bug || 0} code-quality issue(s)` +
+        (codeSecurity.top?.length ? `. Examples: ${codeSecurity.top.join("; ")}` : "") +
+        ". Note many findings are in third-party widgets the nonprofit can't edit directly."
+      : "Website code audit: no issues (or not run)";
     const result = await client.messages.create({
       model: MODEL,
       max_tokens: 16000,
@@ -233,8 +215,8 @@ app.post("/api/breach-report", async (req, res) => {
       system:
         "You advise small nonprofits with no IT staff. A scan of their public website found staff emails, " +
         "names and phone numbers, checked those emails against known data breaches, checked via live DNS " +
-        "whether the domain can be spoofed in email (SPF/DMARC/DKIM), and checked the site's TLS certificate and " +
-        "HTTP security headers (CSP/HSTS/X-Frame-Options, etc.). " +
+        "whether the domain can be spoofed in email (SPF/DMARC/DKIM), checked the site's TLS certificate and " +
+        "HTTP security headers (CSP/HSTS/X-Frame-Options, etc.), and statically scanned the JavaScript the site ships. " +
         "Explain, in plain language a volunteer can act on, the concrete RISKS this exposure creates " +
         "(who an attacker could impersonate, what a breached password lets them do, how harvested names/phones enable " +
         "phishing and vishing, and what an unprotected domain lets attackers send), the real-world CONSEQUENCES, and WHO is at risk. " +
@@ -252,6 +234,7 @@ app.post("/api/breach-report", async (req, res) => {
             `${domainLines}\n\n` +
             `${webLines}\n\n` +
             `${repLines}\n\n` +
+            `${codeLines}\n\n` +
             `Write a 2-3 sentence summary, 3-5 risks, and 4-6 ordered action steps.`,
         },
       ],
@@ -277,54 +260,6 @@ app.post("/api/js-audit", async (req, res) => {
     const code = msg === "invalid_domain" ? 400 : msg === "unreachable" ? 502 : 500;
     console.error("js-audit error:", msg);
     res.status(code).json({ error: msg });
-  }
-});
-
-// JS Auditor: turn raw static findings into a plain-language summary + plan.
-app.post("/api/js-report", async (req, res) => {
-  if (!client) return res.status(503).json({ error: "no_api_key" });
-  const { orgName, domain, counts, findings } = req.body ?? {};
-  try {
-    // Group findings by title so the model sees patterns, not 200 raw rows.
-    const byTitle = new Map();
-    for (const f of (findings || []).slice(0, 120)) {
-      const k = `${f.severity}|${f.title}`;
-      const g = byTitle.get(k) || { severity: f.severity, title: f.title, detail: f.detail, files: new Set() };
-      g.files.add(f.file);
-      byTitle.set(k, g);
-    }
-    const findingLines = [...byTitle.values()]
-      .map((g) => `- [${g.severity}] ${g.title} — ${g.files.size} file(s): ${[...g.files].slice(0, 4).join(", ")}. ${g.detail}`)
-      .join("\n");
-    const result = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: { type: "json_schema", schema: JS_REPORT_SCHEMA } },
-      system:
-        "You advise small nonprofits with no IT staff or developers. An automated scanner read the JavaScript " +
-        "their public website ships to visitors and flagged potential bugs and security risks (hardcoded secrets, " +
-        "cross-site-scripting sinks, insecure http requests, leftover debug code, outdated/vulnerable libraries). " +
-        "Explain in plain language what these findings mean, which ones genuinely matter and why, and what the real-world " +
-        "consequence would be (site defacement, stolen donor data, drained API/cloud accounts). Then give a prioritized, " +
-        "jargon-free fix plan they can hand to a volunteer or their web host — highest-impact, easiest wins first. Many " +
-        "findings come from third-party widgets the nonprofit can't edit; say so and tell them what to do instead (update " +
-        "the plugin, contact the vendor, restrict the key). Be specific to what was actually found; never invent findings.",
-      messages: [
-        {
-          role: "user",
-          content:
-            `Organization: ${orgName || domain} (domain ${domain}).\n` +
-            `Severity counts: ${JSON.stringify(counts || {})}.\n\n` +
-            `Findings (grouped):\n${findingLines || "none"}\n\n` +
-            `Write a 2-3 sentence summary and 3-6 ordered recommendations.`,
-        },
-      ],
-    });
-    res.json(parseJsonContent(result));
-  } catch (err) {
-    console.error("js-report error:", err?.message || err);
-    res.status(502).json({ error: "ai_error" });
   }
 });
 

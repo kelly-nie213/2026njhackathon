@@ -10,6 +10,7 @@ import {
   checkReputation,
   breachedAccounts,
   totalBreaches,
+  domainBreachSummary,
   SEVERITY_META,
   type CrawlResult,
   type BreachLookup,
@@ -21,10 +22,8 @@ import {
 } from "../lib/breach";
 import {
   auditJs,
-  generateJsReport,
   worstSeverity,
   type JsAuditResult,
-  type JsReport,
   type JsFinding,
 } from "../lib/jsaudit";
 import { askAdvisor, type AdvisorProfile, type ChatMessage } from "../lib/api";
@@ -58,8 +57,6 @@ export default function BreachDetector() {
   const [report, setReport] = useState<BreachReport | null>(null);
   const [reportSource, setReportSource] = useState<"ai" | "fallback">("fallback");
   const [jsAudit, setJsAudit] = useState<JsAuditResult | null>(null);
-  const [jsReport, setJsReport] = useState<JsReport | null>(null);
-  const [jsReportSource, setJsReportSource] = useState<"ai" | "fallback">("fallback");
 
   const cleanDomain = domain.trim().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
   const canSubmit = cleanDomain.includes(".");
@@ -94,18 +91,14 @@ export default function BreachDetector() {
       setJsAudit(auditRes);
       setStep(8);
 
-      // Breach report + code-audit report are separate AI calls — run in parallel.
+      // One unified action plan covering everything — exposure + code.
       const orgLabel = orgName.trim() || crawlRes.domain;
-      const [breachOut, jsOut] = await Promise.all([
-        generateReport(crawlRes, lookupRes, orgLabel, domainSecRes, webSecRes, repRes),
-        auditRes ? generateJsReport(auditRes, orgLabel) : Promise.resolve(null),
-      ]);
+      const codeSummary = auditRes
+        ? { security: auditRes.counts.security || 0, bug: auditRes.counts.bug || 0, top: auditRes.findings.slice(0, 6).map((f) => f.title) }
+        : null;
+      const breachOut = await generateReport(crawlRes, lookupRes, orgLabel, domainSecRes, webSecRes, repRes, codeSummary);
       setReport(breachOut.report);
       setReportSource(breachOut.source);
-      if (jsOut) {
-        setJsReport(jsOut.report);
-        setJsReportSource(jsOut.source);
-      }
       setPhase("report");
     } catch (e) {
       const msg = (e as Error)?.message || "scan_failed";
@@ -129,7 +122,6 @@ export default function BreachDetector() {
     setReputation(null);
     setReport(null);
     setJsAudit(null);
-    setJsReport(null);
     setStep(0);
   };
 
@@ -169,8 +161,6 @@ export default function BreachDetector() {
               report={report}
               reportSource={reportSource}
               jsAudit={jsAudit}
-              jsReport={jsReport}
-              jsReportSource={jsReportSource}
               onReset={resetAll}
             />
           )}
@@ -489,11 +479,9 @@ function ReportView(props: {
   report: BreachReport;
   reportSource: "ai" | "fallback";
   jsAudit: JsAuditResult | null;
-  jsReport: JsReport | null;
-  jsReportSource: "ai" | "fallback";
   onReset: () => void;
 }) {
-  const { orgName, crawl, lookup, domainSec, webSec, reputation, report, reportSource, jsAudit, jsReport, jsReportSource, onReset } = props;
+  const { orgName, crawl, lookup, domainSec, webSec, reputation, report, reportSource, jsAudit, onReset } = props;
   const breachedCount = breachedAccounts(lookup);
   const totalB = totalBreaches(lookup);
   const [reportTab, setReportTab] = useState<ReportTab>("found");
@@ -650,16 +638,17 @@ function ReportView(props: {
               )}
             </div>
 
+            {/* domain-level breach rollup */}
+            {breachedCount > 0 && <DomainBreachCard lookup={lookup} domain={crawl.domain} />}
+
             {/* domain spoofing protection (live DNS) */}
             {domainSec && <DomainSecurityCard sec={domainSec} />}
 
             {/* web security: TLS + HTTP headers (live) */}
             {webSec && <WebSecurityCard sec={webSec} />}
 
-            {/* website code security (combined JS audit) */}
-            {jsAudit && (
-              <CodeSecuritySection audit={jsAudit} report={jsReport} reportSource={jsReportSource} />
-            )}
+            {/* website code security (findings only — fixes live in the unified action plan) */}
+            {jsAudit && <CodeSecuritySection audit={jsAudit} />}
           </motion.div>
         )}
 
@@ -1013,15 +1002,7 @@ function ProfileSelect({ label, value, opts, onChange }: { label: string; value:
   );
 }
 
-function CodeSecuritySection({
-  audit,
-  report,
-  reportSource,
-}: {
-  audit: JsAuditResult;
-  report: JsReport | null;
-  reportSource: "ai" | "fallback";
-}) {
+function CodeSecuritySection({ audit }: { audit: JsAuditResult }) {
   const top = worstSeverity(audit);
   const topMeta = SEVERITY_META[top];
   const hasFindings = audit.findings.length > 0;
@@ -1048,57 +1029,10 @@ function CodeSecuritySection({
         </div>
       </div>
 
-      {/* summary + fix plan */}
-      {report && (
-        <div className="card card-glow p-6">
-          <div className="mb-1 flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-bold">Summary & fix plan</h3>
-            {reportSource === "ai" && (
-              <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
-                ✦ AI-assessed
-              </span>
-            )}
-          </div>
-          <p className="mb-5 text-sm leading-relaxed text-fg/85">{report.summary}</p>
-          <div className="space-y-3">
-            {report.recommendations.map((rec, i) => (
-              <details
-                key={i}
-                className="group rounded-xl border border-white/8 bg-white/[0.02] p-4 open:border-brand-400/40"
-                open={i === 0}
-              >
-                <summary className="flex cursor-pointer list-none items-center gap-3">
-                  <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white">
-                    {i + 1}
-                  </span>
-                  <span className="flex-1 font-semibold">{rec.title}</span>
-                  <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-muted">
-                    {rec.effort}
-                  </span>
-                  <span className="text-muted transition group-open:rotate-180">▾</span>
-                </summary>
-                <div className="mt-3 pl-10">
-                  <div className="mb-2 text-xs italic text-brand-300">Why: {rec.why}</div>
-                  <ul className="space-y-1.5">
-                    {rec.steps.map((s, j) => (
-                      <li key={j} className="flex gap-2 text-sm text-fg/85">
-                        <span className="text-brand-400">›</span>
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </details>
-            ))}
-          </div>
-          {reportSource === "fallback" && (
-            <div className="mt-4 rounded-lg bg-white/[0.03] px-3 py-2 text-[11px] text-muted">
-              Showing the built-in plan — add an <span className="text-fg">ANTHROPIC_API_KEY</span> to
-              generate one tailored to your exact findings.
-            </div>
-          )}
-        </div>
-      )}
+      <p className="text-sm text-muted">
+        Fixes for these are folded into your single action plan in the{" "}
+        <span className="text-fg">Step-by-Step Action</span> tab.
+      </p>
 
       {/* findings */}
       <div className="card p-6">
@@ -1322,6 +1256,54 @@ function ReputationCard({ rep }: { rep: Reputation }) {
           {rep.notChecked.map((n) => `${n.name} (${n.reason})`).join(" · ")}
         </p>
       )}
+    </div>
+  );
+}
+
+function DomainBreachCard({ lookup, domain }: { lookup: BreachLookup; domain: string }) {
+  const { breachedEmails, distinctBreaches, breaches } = domainBreachSummary(lookup);
+  if (breaches.length === 0) return null;
+  return (
+    <div className="card p-6">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-bold">Breaches affecting your domain</h2>
+        <span className="rounded-full bg-risk-crit/15 px-2 py-0.5 text-[11px] font-semibold text-risk-high">
+          {distinctBreaches} breach{distinctBreaches === 1 ? "" : "es"}
+        </span>
+      </div>
+      <p className="mb-4 text-sm text-muted">
+        Across the {breachedEmails} public {domain} address{breachedEmails === 1 ? "" : "es"} we found, these known
+        breaches appear. (A full list of every account at your domain would require verifying you own it.)
+      </p>
+      <div className="space-y-2.5">
+        {breaches.map((b) => (
+          <div key={b.title} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{b.title}</span>
+                {b.breachDate && <span className="text-[11px] text-muted">{b.breachDate.slice(0, 4)}</span>}
+                {b.hasPasswords && (
+                  <span className="rounded-full bg-risk-crit/15 px-2 py-0.5 text-[10px] font-semibold text-risk-high">
+                    passwords leaked
+                  </span>
+                )}
+              </div>
+              <span className="flex-none text-[11px] text-muted">
+                hit {b.emailsAffected} email{b.emailsAffected === 1 ? "" : "s"}
+              </span>
+            </div>
+            {b.dataClasses.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {b.dataClasses.slice(0, 6).map((c) => (
+                  <span key={c} className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-muted">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

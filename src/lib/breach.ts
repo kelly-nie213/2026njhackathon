@@ -107,6 +107,13 @@ export interface Reputation {
   sourcesChecked: number;
 }
 
+/** Compact code-audit summary folded into the single unified action plan. */
+export interface CodeSummary {
+  security: number;
+  bug: number;
+  top: string[];
+}
+
 /* --------------------------- API calls --------------------------- */
 
 /** Live DNS spoofing-protection check. Returns null on failure (optional in the UI). */
@@ -184,7 +191,8 @@ export async function generateReport(
   orgName: string,
   domainSec?: DomainSecurity | null,
   webSec?: WebSecurity | null,
-  reputation?: Reputation | null
+  reputation?: Reputation | null,
+  code?: CodeSummary | null
 ): Promise<{ report: BreachReport; source: "ai" | "fallback" }> {
   try {
     const res = await fetch("/api/breach-report", {
@@ -227,13 +235,16 @@ export async function generateReport(
                 .map((c) => ({ label: c.label, title: c.title })),
             }
           : null,
+        codeSecurity: code && (code.security || code.bug)
+          ? { security: code.security, bug: code.bug, top: code.top }
+          : null,
       }),
     });
     if (res.ok) return { report: await res.json(), source: "ai" };
   } catch {
     /* fall through */
   }
-  return { report: buildReport(crawl, lookup, domainSec, webSec, reputation), source: "fallback" };
+  return { report: buildReport(crawl, lookup, domainSec, webSec, reputation, code), source: "fallback" };
 }
 
 /* ----------------------- deterministic engine ----------------------- */
@@ -246,13 +257,43 @@ export function breachedAccounts(lookup: BreachLookup): number {
   return lookup.results.filter((r) => r.status === "breached").length;
 }
 
-/** Worst severity, used to color the headline. */
-export function overallSeverity(lookup: BreachLookup): Severity {
-  const max = Math.max(0, ...lookup.results.map((r) => r.breachCount));
-  if (max >= 4 || breachedAccounts(lookup) >= 3) return "critical";
-  if (max >= 2 || breachedAccounts(lookup) >= 1) return "high";
-  if (max >= 1) return "medium";
-  return "low";
+export interface DomainBreachRollup {
+  title: string;
+  breachDate: string;
+  emailsAffected: number;
+  dataClasses: string[];
+  hasPasswords: boolean;
+}
+
+/**
+ * Domain-level view of the breach data: roll the per-email hits up into the
+ * distinct breaches that touched this domain's public addresses, with how many
+ * of those addresses each breach hit. Derived from the real per-email lookups
+ * (a full "every account at the domain" enumeration needs domain verification).
+ */
+export function domainBreachSummary(lookup: BreachLookup): {
+  breachedEmails: number;
+  distinctBreaches: number;
+  breaches: DomainBreachRollup[];
+} {
+  const map = new Map<string, DomainBreachRollup>();
+  for (const r of lookup.results) {
+    if (r.status !== "breached") continue;
+    for (const b of r.breaches) {
+      const cur =
+        map.get(b.title) ||
+        { title: b.title, breachDate: b.breachDate || "", emailsAffected: 0, dataClasses: [], hasPasswords: false };
+      cur.emailsAffected += 1;
+      for (const c of b.dataClasses || []) if (!cur.dataClasses.includes(c)) cur.dataClasses.push(c);
+      if ((b.dataClasses || []).some((c) => /password/i.test(c))) cur.hasPasswords = true;
+      if (!cur.breachDate && b.breachDate) cur.breachDate = b.breachDate;
+      map.set(b.title, cur);
+    }
+  }
+  const breaches = [...map.values()].sort(
+    (a, b) => b.emailsAffected - a.emailsAffected || (a.title < b.title ? -1 : 1)
+  );
+  return { breachedEmails: breachedAccounts(lookup), distinctBreaches: breaches.length, breaches };
 }
 
 function buildReport(
@@ -260,7 +301,8 @@ function buildReport(
   lookup: BreachLookup,
   domainSec?: DomainSecurity | null,
   webSec?: WebSecurity | null,
-  reputation?: Reputation | null
+  reputation?: Reputation | null,
+  code?: CodeSummary | null
 ): BreachReport {
   const breached = lookup.results.filter((r) => r.status === "breached");
   const worst = [...breached].sort((a, b) => b.breachCount - a.breachCount)[0];
@@ -330,6 +372,18 @@ function buildReport(
         whoAtRisk: ["Anyone who visits your website", "Logged-in staff/admins"],
       });
     }
+  }
+
+  if (code && code.security > 0) {
+    risks.push({
+      title: `${code.security} security issue${code.security === 1 ? "" : "s"} in your website's code`,
+      severity: code.security >= 3 ? "high" : "medium",
+      consequence:
+        "The JavaScript your site ships to visitors has flagged issues" +
+        (code.top.length ? ` (e.g. ${code.top.slice(0, 3).join(", ")})` : "") +
+        ". Depending on the type, these can expose keys, enable cross-site scripting, or send data insecurely.",
+      whoAtRisk: ["Anyone who visits your website"],
+    });
   }
 
   if (crawl.emails.length > 0) {
@@ -422,6 +476,19 @@ function buildReport(
         "Ask your host/CDN (Cloudflare, Netlify, etc.) to add: Content-Security-Policy, Strict-Transport-Security (HSTS), X-Frame-Options, and X-Content-Type-Options: nosniff.",
         "Make sure http:// redirects to https:// and your certificate auto-renews.",
         "Re-run this scan to confirm the grade improves.",
+      ],
+    });
+  }
+
+  if (code && (code.security > 0 || code.bug > 0)) {
+    actions.push({
+      title: "Review the issues found in your website's code",
+      why: "Most are in third-party widgets/plugins you can't edit directly, so the fix is usually updating or replacing them rather than rewriting code.",
+      effort: "varies",
+      steps: [
+        "Open the Website code security section for the file and line of each finding.",
+        "For your own code, rotate any exposed keys and sanitize values written into the page.",
+        "For third-party scripts, update the plugin/widget or contact the vendor.",
       ],
     });
   }
