@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brand } from "../components/Brand";
-import { useScan } from "../store";
 import {
   QUESTIONS,
   triage,
@@ -25,7 +24,6 @@ function describe(answers: Answers): string {
 
 export default function IncidentTriage() {
   const nav = useNavigate();
-  const { input } = useScan();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [result, setResult] = useState<TriageResult | null>(null);
@@ -66,7 +64,7 @@ export default function IncidentTriage() {
   const runAi = async () => {
     if (!result) return;
     setLoading(true);
-    const guide = await generateRecovery(describe(answers), result, input?.orgName ?? "a small nonprofit");
+    const guide = await generateRecovery(describe(answers), result, "a small nonprofit");
     setRecovery(guide);
     setLoading(false);
   };
@@ -80,7 +78,7 @@ export default function IncidentTriage() {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Brand />
           <button
-            onClick={() => nav(input ? "/dashboard" : "/")}
+            onClick={() => nav("/")}
             className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
           >
             ← Back

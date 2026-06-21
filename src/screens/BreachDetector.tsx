@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brand } from "../components/Brand";
-import { SEVERITY_META } from "../lib/scan";
 import {
   crawlDomain,
   lookupBreaches,
   generateReport,
   breachedAccounts,
   totalBreaches,
+  SEVERITY_META,
   type CrawlResult,
   type BreachLookup,
   type BreachReport,
@@ -92,14 +92,17 @@ export default function BreachDetector() {
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
         <Brand />
         <div className="flex items-center gap-2">
-          <span className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-muted sm:inline">
-            BreachDetector
-          </span>
           <button
-            onClick={() => nav("/")}
-            className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
+            onClick={() => nav("/phishing")}
+            className="rounded-full border border-brand-400/40 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20"
           >
-            ← Health check
+            ✉️ Phishing checker
+          </button>
+          <button
+            onClick={() => nav("/triage")}
+            className="rounded-full border border-risk-high/40 bg-risk-crit/10 px-3 py-1 text-xs font-medium text-risk-high transition hover:bg-risk-crit/20"
+          >
+            ⚑ Something already happened?
           </button>
         </div>
       </header>
@@ -193,7 +196,7 @@ function InputView(props: {
         <ul className="mt-7 space-y-3 text-sm">
           {[
             "Finds the emails & contact info an attacker would scrape first",
-            "Checks each address against Have I Been Pwned",
+            "Checks each address against known breaches (XposedOrNot)",
             "Turns it into risks, consequences, and a step-by-step plan",
           ].map((t) => (
             <li key={t} className="flex items-start gap-3 text-fg/90">

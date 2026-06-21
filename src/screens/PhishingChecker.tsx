@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brand } from "../components/Brand";
-import { useScan } from "../store";
 import { analyzePhishing, type PhishingVerdict } from "../lib/api";
 
 const SAMPLE = `From: Pastor David Reyes <d.reyes@grace-foodbank.com>
@@ -24,7 +23,6 @@ const VERDICT_META: Record<
 
 export default function PhishingChecker() {
   const nav = useNavigate();
-  const { input } = useScan();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PhishingVerdict | null>(null);
@@ -33,7 +31,7 @@ export default function PhishingChecker() {
     if (!text.trim()) return;
     setLoading(true);
     setResult(null);
-    const verdict = await analyzePhishing(text, input?.orgName ?? "a small nonprofit");
+    const verdict = await analyzePhishing(text, "a small nonprofit");
     setResult(verdict);
     setLoading(false);
   };
@@ -44,7 +42,7 @@ export default function PhishingChecker() {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <Brand />
           <button
-            onClick={() => nav(input ? "/dashboard" : "/")}
+            onClick={() => nav("/")}
             className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
           >
             ← Back
