@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -65,7 +66,7 @@
     /* Slide header */
     .slide-header {
       display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 44px; position: relative; z-index: 2;
+      margin-bottom: 40px; position: relative; z-index: 2;
     }
     .logo {
       font-family: var(--serif); font-size: 20px;
@@ -77,6 +78,15 @@
       font-weight: 500; letter-spacing: 0.18em;
       text-transform: uppercase; color: var(--cream-40);
     }
+    /* Criterion weight pill in the header */
+    .crit {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--sans); font-size: 10px; font-weight: 500;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--gold); border: 1px solid var(--gold-border);
+      background: var(--gold-dim); border-radius: 100px; padding: 5px 13px;
+    }
+    .crit b { font-weight: 600; }
 
     /* Content */
     .slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; position: relative; z-index: 2; }
@@ -108,44 +118,51 @@
       font-family: var(--serif);
       font-size: clamp(40px, 5.5vw, 68px);
       font-weight: 300; font-style: italic;
-      line-height: 1.08; color: var(--cream); margin-bottom: 36px;
+      line-height: 1.08; color: var(--cream); margin-bottom: 28px;
     }
     h2 strong { font-weight: 600; font-style: normal; color: var(--gold); }
     h3 { font-family: var(--serif); font-size: 26px; font-weight: 500; color: var(--cream); margin-bottom: 10px; }
     p { font-family: var(--sans); font-size: 15px; font-weight: 300; line-height: 1.72; color: var(--cream-60); }
 
+    .answer {
+      font-family: var(--sans); font-size: 10px; font-weight: 500;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--teal); margin-bottom: 14px;
+    }
+
     .divider { width: 56px; height: 1px; background: var(--gold); margin: 22px 0; opacity: 0.55; }
     .divider.centered { margin: 22px auto; }
 
     /* Stat cards */
-    .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; margin-top: 36px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; margin-top: 32px; }
     .stat-card { background: var(--cream-10); border: 1px solid var(--border); border-radius: 14px; padding: 26px 22px; }
     .stat-number { font-family: var(--serif); font-size: 50px; font-weight: 600; color: var(--gold); line-height: 1; margin-bottom: 8px; }
     .stat-label { font-family: var(--sans); font-size: 13px; font-weight: 300; color: var(--cream-60); line-height: 1.55; }
 
     /* Pillar grid */
     .pillar-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    .pillar { background: var(--cream-10); border: 1px solid var(--border); border-radius: 16px; padding: 26px 24px; transition: border-color 0.3s; }
+    .pillar { background: var(--cream-10); border: 1px solid var(--border); border-radius: 16px; padding: 24px 24px; transition: border-color 0.3s; }
     .pillar:hover { border-color: rgba(232,184,109,0.4); }
-    .pillar-num { font-family: var(--serif); font-size: 26px; font-weight: 600; font-style: italic; color: var(--gold); margin-bottom: 10px; }
+    .pillar-num { font-family: var(--serif); font-size: 26px; font-weight: 600; font-style: italic; color: var(--gold); margin-bottom: 8px; }
     .pillar-title { font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--cream); margin-bottom: 8px; }
     .pillar-desc { font-family: var(--sans); font-size: 13px; font-weight: 300; color: var(--cream-40); line-height: 1.6; }
 
     /* Feature list */
-    .feature-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .feature-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
     .feature-list li {
       display: flex; align-items: flex-start; gap: 12px;
       font-family: var(--sans); font-size: 15px;
       font-weight: 300; color: var(--cream-60); line-height: 1.5;
     }
     .feature-list li::before { content: '\2713'; color: var(--gold); flex-shrink: 0; }
+    .feature-list li strong { color: var(--cream); font-weight: 500; }
 
     /* Two-column */
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
     .col-label {
       font-family: var(--sans); font-size: 10px;
       font-weight: 500; letter-spacing: 0.16em;
-      text-transform: uppercase; color: var(--teal); margin-bottom: 18px;
+      text-transform: uppercase; color: var(--teal); margin-bottom: 16px;
     }
     .col-label.coral   { color: var(--coral); }
     .col-label.lavender{ color: var(--lavender); }
@@ -157,8 +174,9 @@
       font-weight: 300; font-style: italic;
       color: var(--cream); line-height: 1.42;
       border-left: 2px solid var(--coral);
-      padding-left: 22px; margin-top: 30px;
+      padding-left: 22px; margin-top: 28px;
     }
+    .quote em { color: var(--gold); font-style: italic; }
 
     /* Chips */
     .chip-row { display: flex; flex-wrap: wrap; gap: 9px; }
@@ -168,16 +186,18 @@
       font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--gold);
     }
 
-    /* Safety / highlight box */
-    .safety-box { background: var(--coral-dim); border: 1px solid var(--coral-border); border-radius: 14px; padding: 22px; margin-bottom: 20px; }
-    .safety-box h3 { color: var(--coral); }
-
     /* Highlight card */
     .coin-card {
       background: linear-gradient(140deg, var(--gold-dim), rgba(232,184,109,.04));
       border: 1px solid var(--gold-border); border-radius: 22px;
-      padding: 44px 36px; text-align: center;
+      padding: 32px 30px;
     }
+    .badge-card {
+      background: linear-gradient(140deg, var(--lavender-dim), rgba(155,137,196,.03));
+      border: 1px solid rgba(155,137,196,0.32); border-radius: 18px;
+      padding: 24px 26px; margin-top: 24px;
+    }
+    .badge-card .col-label { color: var(--lavender); }
 
     /* Team grid */
     .team-grid { display: flex; gap: 16px; margin-top: 28px; }
@@ -186,7 +206,7 @@
     .team-role { font-family: var(--sans); font-size: 11px; font-weight: 300; color: var(--cream-40); }
 
     /* Big CTA */
-    .big-cta { font-family: var(--serif); font-size: clamp(44px, 6.5vw, 84px); font-weight: 300; font-style: italic; color: var(--cream); line-height: 1.08; margin-top: 32px; }
+    .big-cta { font-family: var(--serif); font-size: clamp(44px, 6.5vw, 84px); font-weight: 300; font-style: italic; color: var(--cream); line-height: 1.08; margin-top: 28px; }
     .cta-accent { color: var(--gold); font-weight: 600; font-style: normal; }
 
     /* Navigation */
@@ -220,6 +240,7 @@
     /* Slide content entrance */
     .slide.anim .slide-header { animation: fadeUp 0.5s cubic-bezier(.16,1,.3,1) both 0.05s; }
     .slide.anim .eyebrow { animation: fadeUp 0.6s cubic-bezier(.16,1,.3,1) both 0.15s; }
+    .slide.anim .answer { animation: fadeUp 0.6s cubic-bezier(.16,1,.3,1) both 0.15s; }
     .slide.anim h2, .slide.anim .display-title, .slide.anim .big-cta { animation: fadeUp 0.7s cubic-bezier(.16,1,.3,1) both 0.25s; }
     .slide.anim .divider { transform-origin: left; animation: expandLine 0.6s cubic-bezier(.16,1,.3,1) both 0.38s; }
     .slide.anim .divider.centered { transform-origin: center; }
@@ -232,6 +253,7 @@
     .slide.anim .two-col > div:nth-child(1) { animation: fadeUp 0.65s cubic-bezier(.16,1,.3,1) both 0.38s; }
     .slide.anim .two-col > div:nth-child(2) { animation: fadeUp 0.65s cubic-bezier(.16,1,.3,1) both 0.54s; }
     .slide.anim .chip-row { animation: fadeUp 0.65s cubic-bezier(.16,1,.3,1) both 0.68s; }
+    .slide.anim .badge-card { animation: fadeUp 0.7s cubic-bezier(.16,1,.3,1) both 0.74s; }
     .slide.anim .pillar:nth-child(1) { animation: fadeUp 0.65s cubic-bezier(.16,1,.3,1) both 0.32s; }
     .slide.anim .pillar:nth-child(2) { animation: fadeUp 0.65s cubic-bezier(.16,1,.3,1) both 0.46s; }
     .slide.anim .pillar:nth-child(3) { animation: fadeUp 0.65s cubic-bezier(.16,1,.3,1) both 0.60s; }
@@ -254,30 +276,28 @@
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">NJx Hackathon · June 2026</span>
     </div>
 
     <div class="slide-content centered">
-      <div class="eyebrow">Protecting the Future</div>
+      <div class="eyebrow">Find Who Needs Defending</div>
       <h1 class="display-title">Aegis</h1>
       <div class="divider centered"></div>
       <p class="tagline">See your nonprofit through an attacker's eyes.</p>
-      <p class="subtitle">Free, two-minute cyber defense for the organizations attackers target most</p>
+      <p class="subtitle">A free, two-minute cyber health check for the orgs attackers target most — and the people without an IT team to defend them.</p>
     </div>
   </section>
 
-  <!-- SLIDE 2 · THE PROBLEM (real value) -->
+  <!-- SLIDE 2 · REAL VALUE (25%) -->
   <section class="slide" id="slide-2">
     <div class="orb orb--coral" style="top:-130px; right:140px;"></div>
     <div class="orb orb--lavender" style="bottom:-120px; left:180px;"></div>
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">The Problem</span>
     </div>
 
     <div class="slide-content">
-      <div class="eyebrow">Who Needs Defending</div>
+      <div class="answer">Are we solving a genuine problem for a real org we can reach?</div>
       <h2>AI made attacks <strong>cheap, fast, personal</strong></h2>
 
       <div class="stat-grid">
@@ -296,7 +316,8 @@
       </div>
 
       <div class="quote">
-        "Small nonprofits are common attack targets —<br>but <em>can't afford enterprise security.</em>"
+        Small nonprofits hold donor, volunteer and financial data and get hit constantly —<br>
+        but <em>can't afford enterprise security, and have no IT team to run it.</em>
       </div>
     </div>
   </section>
@@ -308,19 +329,26 @@
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">What It Is</span>
     </div>
 
     <div class="slide-content">
-      <div class="eyebrow">The Solution</div>
+      <div class="answer">"Did we get hit — and what do we do now?" in plain English</div>
       <h2>One domain in. A <strong>full report</strong> out.</h2>
 
-      <p style="font-size:18px; max-width:760px; margin-top:8px;">
+      <p style="font-size:18px; max-width:780px; margin-top:4px;">
         Aegis is a free, two-minute cyber health check. Enter your domain — no install, no IT team —
-        and see exactly what an attacker can find, plus a plain-English plan for what to fix first.
+        and see exactly what an attacker can find, plus a prioritized, plain-English plan for what to fix first.
+        Built around four tools a non-technical admin can actually use:
       </p>
 
-      <div class="chip-row" style="margin-top:32px;">
+      <ul class="feature-list" style="margin-top:24px; max-width:760px;">
+        <li><strong>Breach Detector</strong> — the core scan: what's exposed, graded and ranked</li>
+        <li><strong>Phishing Checker</strong> — paste a suspicious message, get a verdict and the red flags</li>
+        <li><strong>Incident Triage</strong> — describe what happened, get calm ordered recovery steps</li>
+        <li><strong>Ask Aegis</strong> — a chat grounded in your real results: "What do I fix first?"</li>
+      </ul>
+
+      <div class="chip-row" style="margin-top:26px;">
         <div class="chip">Free</div>
         <div class="chip">No install</div>
         <div class="chip">No IT team needed</div>
@@ -330,102 +358,97 @@
     </div>
   </section>
 
-  <!-- SLIDE 4 · WHO IT'S FOR -->
+  <!-- SLIDE 4 · CUSTOMER FIT (15%) -->
   <section class="slide" id="slide-4">
     <div class="orb orb--lavender" style="top:80px; right:-100px;"></div>
     <div class="orb orb--coral" style="bottom:-80px; left:100px;"></div>
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">Who It's For</span>
     </div>
 
     <div class="slide-content">
-      <div class="eyebrow">Customer Fit</div>
+      <div class="answer">Who is it for — and why would they adopt it now?</div>
       <h2>Built for the ones <strong>without a security team</strong></h2>
 
-      <div class="two-col" style="margin-top:36px;">
+      <div class="two-col" style="margin-top:30px;">
         <div>
-          <div class="col-label">Small nonprofits</div>
-          <p>They hold donor, volunteer and financial data, get targeted constantly, and have zero budget for enterprise tools — or staff to run them. (The hackathon's own example #4.)</p>
+          <div class="col-label">Who it's for</div>
+          <p><strong style="color:var(--cream);">Small nonprofits</strong> — the hackathon's own Arc 4 customer. They hold sensitive data, get targeted constantly, and have zero budget for enterprise tools or staff to run them. Plus the everyday orgs and people who own a domain but can't read a DMARC record: churches, clubs, schools, small businesses.</p>
         </div>
         <div>
-          <div class="col-label coral">Everyday orgs &amp; people</div>
-          <p>Anyone who owns a domain but can't read a DMARC record — churches, clubs, schools, small businesses. People who'd never run a security scanner on their own.</p>
+          <div class="col-label coral">Why now</div>
+          <p>AI now writes flawless, personalized phishing at scale. The cost of attacking the smallest, least-defended targets just dropped to near zero — so they've become the <strong style="color:var(--cream);">easiest and most profitable</strong> ones to hit. The orgs with the least defense are suddenly the most exposed.</p>
         </div>
       </div>
 
       <div class="quote">
-        Why now: AI writes flawless, personalized phishing at scale —<br>
-        the <em>least-defended</em> are suddenly the easiest, most profitable targets.
+        We can reach them: the deployability test is whether a broke, no-IT org<br>
+        could adopt this <em>on Monday.</em> Aegis is a link you send them — nothing to install.
       </div>
     </div>
   </section>
 
-  <!-- SLIDE 5 · THE DEMO -->
+  <!-- SLIDE 5 · EXECUTION (20%) -->
   <section class="slide" id="slide-5">
     <div class="orb orb--gold" style="top:-150px; left:180px;"></div>
     <div class="orb orb--teal" style="bottom:40px; right:-110px;"></div>
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">The Demo</span>
     </div>
 
     <div class="slide-content">
-      <div class="eyebrow">Live in Two Minutes</div>
+      <div class="answer">What we actually built and shipped this weekend</div>
       <h2>One scan. <strong>Five real checks.</strong> One plan.</h2>
 
-      <div class="two-col" style="margin-top:32px; align-items:center;">
+      <div class="two-col" style="margin-top:26px; align-items:center;">
         <div>
-          <div class="col-label">Enter a domain &rarr; we check</div>
+          <div class="col-label">Enter a domain &rarr; we run, live</div>
           <ul class="feature-list">
             <li><strong>Breach exposure</strong> — emails harvested, checked against breach databases</li>
             <li><strong>Email spoofing</strong> — SPF / DMARC / DKIM via live DNS</li>
             <li><strong>Web &amp; TLS</strong> — certificate + security headers, graded A&ndash;F</li>
             <li><strong>Code audit</strong> — secrets, XSS, outdated libraries in shipped JS</li>
-            <li><strong>Reputation</strong> — live malware / phishing blocklists</li>
+            <li><strong>Reputation</strong> — four live malware / phishing blocklists</li>
           </ul>
         </div>
         <div class="coin-card">
           <div style="font-family:var(--sans); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--teal); margin-bottom:14px;">The output</div>
           <div style="font-family:var(--serif); font-style:italic; font-size:30px; color:var(--cream); line-height:1.2; margin-bottom:16px;">One prioritized,<br>plain-English plan</div>
-          <p style="font-size:13px; color:var(--cream-60);">+ <strong style="color:var(--gold);">Ask Aegis</strong> — a chat grounded in your real results: "What do I fix first?"</p>
+          <p style="font-size:13px; color:var(--cream-60);">A working app: React front end, an API proxy keeping every key server-side, and a Claude report layer constrained to <strong style="color:var(--gold);">never invent a finding</strong>. Live demo, right now.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- SLIDE 6 · WHY AEGIS (innovation) -->
+  <!-- SLIDE 6 · INNOVATION (15%) -->
   <section class="slide" id="slide-6">
     <div class="orb orb--coral" style="top:0; right:-50px;"></div>
     <div class="orb orb--lavender" style="bottom:-150px; left:160px;"></div>
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">Why They'd Adopt It</span>
     </div>
 
     <div class="slide-content">
-      <div class="eyebrow">What Makes It Different</div>
+      <div class="answer">Is the approach fresh — or a clone of what already exists?</div>
       <h2>Honest tools, <strong>built for them</strong></h2>
 
-      <div class="two-col" style="margin-top:36px;">
+      <div class="two-col" style="margin-top:26px;">
         <div>
           <div class="col-label">Real, never guessed</div>
           <p>Every finding comes from a live source. Sources we can't reach show "not checked" — never a fake all-clear. No LLM hallucinating a risk score. The core runs with no API key, so it's free to operate.</p>
         </div>
         <div>
           <div class="col-label coral">For the non-technical</div>
-          <p>Most tools are dashboards for an IT team that doesn't exist here. Aegis gives plain-English, prioritized, role-aware steps — and an advisor that answers in their words.</p>
+          <p>Most tools are dashboards for an IT team that doesn't exist here. Aegis gives plain-English, prioritized, role-aware steps — and an advisor that answers in their words and budget.</p>
         </div>
       </div>
 
-      <div class="chip-row" style="margin-top:30px;">
-        <div class="chip">Free core, forever</div>
-        <div class="chip">No LLM guesswork</div>
-        <div class="chip">Five checks, one report</div>
-        <div class="chip">Personalized advice</div>
+      <div class="badge-card">
+        <div class="col-label">The fresh part · Verifiable Security Badge</div>
+        <p style="color:var(--cream-60);">A nonprofit can <strong style="color:var(--cream);">prove an independent Aegis scan graded their site</strong> — without publishing the report, which would hand attackers a roadmap. Each claim is hashed into a Merkle tree and signed; the public badge reveals only what they choose (domain, grade, dates) and anyone can verify it offline. Selective disclosure, built for trust without exposure.</p>
       </div>
     </div>
   </section>
@@ -437,14 +460,13 @@
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">Beyond the Weekend</span>
     </div>
 
     <div class="slide-content">
-      <div class="eyebrow">How It Lives On</div>
+      <div class="answer">Could a broke, no-IT org still be using this next month?</div>
       <h2>From a scan to a <strong>standing guard</strong></h2>
 
-      <div class="pillar-grid" style="margin-top:24px;">
+      <div class="pillar-grid" style="margin-top:22px;">
         <div class="pillar">
           <div class="pillar-num">1</div>
           <div class="pillar-title">Keep watching</div>
@@ -469,14 +491,13 @@
     </div>
   </section>
 
-  <!-- SLIDE 8 · CLOSE -->
+  <!-- SLIDE 8 · THE PITCH (15%) -->
   <section class="slide" id="slide-8">
     <div class="orb orb--teal" style="top:-80px; right:200px;"></div>
     <div class="orb orb--gold" style="bottom:-140px; left:100px;"></div>
 
     <div class="slide-header">
       <span class="logo">aegis</span>
-      <span class="slide-label">Thank You</span>
     </div>
 
     <div class="slide-content">
@@ -487,17 +508,16 @@
         <span class="cta-accent">We did.</span>
       </div>
 
-      <div class="divider" style="margin-top:36px;"></div>
+      <div class="divider" style="margin-top:32px;"></div>
 
       <div class="team-grid">
-        <div class="team-member"><div class="team-name">Team Member</div><div class="team-role">Role</div></div>
-        <div class="team-member"><div class="team-name">Team Member</div><div class="team-role">Role</div></div>
-        <div class="team-member"><div class="team-name">Team Member</div><div class="team-role">Role</div></div>
-        <div class="team-member"><div class="team-name">Team Member</div><div class="team-role">Role</div></div>
+        <div class="team-member"><div class="team-name">Sophie Wang</div></div>
+        <div class="team-member"><div class="team-name">Leonardo Chen</div></div>
+        <div class="team-member"><div class="team-name">Kelly Nie</div></div>
       </div>
 
       <p style="margin-top:22px; font-size:13px; color:var(--cream-40);">
-        aegis — free cyber defense for nonprofits and everyday people, in plain English.
+        aegis — free, two-minute cyber defense for nonprofits and everyday people, in plain English.
       </p>
     </div>
   </section>
