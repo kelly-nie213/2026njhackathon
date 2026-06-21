@@ -11,6 +11,7 @@ import {
   breachedAccounts,
   totalBreaches,
   domainBreachSummary,
+  classifyEmail,
   SEVERITY_META,
   type CrawlResult,
   type BreachLookup,
@@ -485,6 +486,16 @@ function ReportView(props: {
   const { orgName, crawl, lookup, domainSec, webSec, reputation, report, reportSource, jsAudit, onReset } = props;
   const breachedCount = breachedAccounts(lookup);
   const totalB = totalBreaches(lookup);
+
+  // Split harvested addresses by likely intent: personal accounts (the real
+  // exposure) vs intentionally-published contact info. Personal goes first,
+  // breached-first within it.
+  const personalEmails = lookup.results
+    .filter((r) => classifyEmail(r.email, crawl.domain) === "personal")
+    .sort((a, b) => b.breachCount - a.breachCount);
+  const contactEmails = lookup.results
+    .filter((r) => classifyEmail(r.email, crawl.domain) === "contact")
+    .sort((a, b) => b.breachCount - a.breachCount);
   const [reportTab, setReportTab] = useState<ReportTab>("found");
   const [demoId, setDemoId] = useState<DemoId>("all");
 
@@ -558,7 +569,7 @@ function ReportView(props: {
         <Stat label="Public emails found"    value={crawl.emails.length}                       accent="high" />
         <Stat label="Emails in breaches"     value={breachedCount}                             accent="crit" />
         <Stat label="Total breach hits"      value={totalB}                                    accent="crit" />
-        <Stat label="Names & phones exposed" value={crawl.names.length + crawl.phones.length} accent="med"  />
+        <Stat label="Personal accounts exposed" value={personalEmails.length} accent="med"  />
       </div>
 
       {/* Verifiable badge — prove the grade without publishing the report */}
@@ -628,30 +639,76 @@ function ReportView(props: {
             {/* threat-intel reputation (live blocklists) */}
             {reputation && <ReputationCard rep={reputation} />}
 
-            <div className="card p-6 space-y-5">
+            <div className="card p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-bold">What we harvested from your site</h2>
-                <p className="mt-1 text-sm text-muted">Public data an attacker could scrape in seconds.</p>
+                <p className="mt-1 text-sm text-muted">
+                  We sort what we found by likely intent — personal accounts that leaked
+                  vs. contact details you meant to publish.
+                </p>
               </div>
 
-              {lookup.results.length > 0 ? (
-                <div className="space-y-2.5">
-                  {lookup.results
-                    .slice()
-                    .sort((a, b) => b.breachCount - a.breachCount)
-                    .map((r) => <EmailRow key={r.email} r={r} />)}
-                </div>
-              ) : (
+              {lookup.results.length === 0 ? (
                 <p className="rounded-xl bg-white/[0.03] px-3 py-3 text-sm text-muted">
                   No public email addresses found — good for your attack surface.
                 </p>
-              )}
+              ) : (
+                <>
+                  {/* ── Personal data exposed (the real attack surface) ── */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--color-risk-crit)" }} />
+                      <h3 className="text-sm font-bold">Personal accounts exposed</h3>
+                      <span className="text-xs text-muted">{personalEmails.length}</span>
+                    </div>
+                    <p className="text-sm text-muted">
+                      Individual people's personal addresses that ended up on your site. These are
+                      the real concern — we checked each against breach databases, and together with
+                      names and phone numbers they give an attacker a ready-made spear-phishing kit.
+                    </p>
+                    {personalEmails.length > 0 ? (
+                      <div className="space-y-2.5">
+                        {personalEmails.map((r) => <EmailRow key={r.email} r={r} />)}
+                      </div>
+                    ) : (
+                      <p className="rounded-xl bg-white/[0.03] px-3 py-3 text-sm text-muted">
+                        None found — no personal accounts are exposed on your public pages.
+                      </p>
+                    )}
+                  </div>
 
-              {(crawl.names.length > 0 || crawl.phones.length > 0) && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {crawl.names.length  > 0 && <Chips title="Names found"         items={crawl.names} />}
-                  {crawl.phones.length > 0 && <Chips title="Phone numbers found" items={crawl.phones} />}
-                </div>
+                  {/* ── Published contact info (expected) ── */}
+                  {(contactEmails.length > 0 || crawl.names.length > 0 || crawl.phones.length > 0) && (
+                    <div className="space-y-2.5 border-t border-white/8 pt-5">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-white/30" />
+                        <h3 className="text-sm font-bold text-fg/80">Published contact info (expected)</h3>
+                      </div>
+                      <p className="text-sm text-muted">
+                        Role mailboxes, your own-domain addresses, and listed staff names/phones —
+                        details you likely put online on purpose. Not a leak, but still useful to an
+                        attacker writing a convincing message, so we list them for awareness.
+                      </p>
+                      {contactEmails.length > 0 && (
+                        <div className="space-y-2.5">
+                          {contactEmails.map((r) => <EmailRow key={r.email} r={r} />)}
+                        </div>
+                      )}
+                      {(crawl.names.length > 0 || crawl.phones.length > 0) && (
+                        <div className="grid gap-4 pt-1 sm:grid-cols-2">
+                          {crawl.names.length  > 0 && <Chips title="Names found"         items={crawl.names} />}
+                          {crawl.phones.length > 0 && <Chips title="Phone numbers found" items={crawl.phones} />}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-muted/80">
+                    We infer intent from patterns (role mailbox, your own domain, free-mail) — so this
+                    is a best guess, not a certainty. A staff member's work address is expected to be
+                    public; the risk is the personal account behind it being breached.
+                  </p>
+                </>
               )}
             </div>
 

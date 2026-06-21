@@ -12,6 +12,92 @@ export interface CrawlResult {
   phones: string[];
 }
 
+/* ──────────────────────────────────────────────
+   Intent classification — "is this address something the org meant to
+   publish, or a personal account that leaked onto the site?"
+   We can't KNOW intent, so this is a transparent heuristic ("likely"),
+   never a claim of certainty. Two signals push an address into the
+   "published contact info (expected)" bucket:
+     • the local-part is a generic role mailbox (info@, contact@, president@…)
+     • it's on the org's own domain (or carries the org's brand on free-mail)
+   Everything else — a person's personal Gmail/Yahoo, etc. — is the real
+   exposure: a named individual whose personal account we can cross-check
+   against breaches and that an attacker can spear-phish.
+────────────────────────────────────────────── */
+
+export type EmailKind = "personal" | "contact";
+
+// Personal-webmail providers. A free-mail address on an org's site is almost
+// always an individual's personal account — the real exposure.
+const FREE_MAIL = new Set([
+  "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "yahoo.co.uk",
+  "hotmail.com", "hotmail.co.uk", "outlook.com", "live.com", "msn.com",
+  "aol.com", "icloud.com", "me.com", "mac.com", "proton.me", "protonmail.com",
+  "gmx.com", "gmx.net", "mail.com", "zoho.com", "yandex.com",
+  "comcast.net", "verizon.net", "sbcglobal.net", "att.net", "cox.net",
+]);
+
+// Common given names — used to tell a person's address (jane.smith@…) apart from
+// a functional mailbox (complaints@…). Mirrors the crawler's list; not exhaustive.
+const COMMON_FIRST_NAMES = new Set(
+  (
+    "james robert john michael david william richard joseph thomas charles christopher daniel matthew anthony mark donald steven andrew paul joshua kenneth kevin brian george timothy ronald edward jason jeffrey ryan jacob gary nicholas eric jonathan stephen larry justin scott brandon benjamin samuel gregory alexander patrick frank raymond jack dennis jerry tyler aaron jose henry adam douglas nathan peter zachary kyle walter harold jeremy ethan carl keith roger gerald christian terry sean arthur austin noah lawrence jesse joe bryan billy jordan albert dylan bruce gabriel alan juan logan wayne ralph roy eugene randy vincent russell louis philip bobby johnny bradley " +
+    "mary patricia jennifer linda elizabeth barbara susan jessica sarah karen lisa nancy betty margaret sandra ashley kimberly emily donna michelle dorothy carol amanda melissa deborah stephanie rebecca sharon laura cynthia kathleen amy angela shirley anna brenda pamela emma nicole helen samantha katherine christine debra rachel carolyn janet catherine maria heather diane ruth julie olivia joyce virginia victoria kelly lauren christina joan evelyn judith megan andrea cheryl hannah jacqueline martha gloria teresa ann sara madison frances kathryn janice jean abigail alice julia judy sophia grace denise amber marilyn danielle beverly isabella theresa diana natalie brittany charlotte marie kayla alexis lori " +
+    "mohammed muhammad ahmed ali omar hassan ibrahim yusuf fatima aisha layla zainab mei wei ling jing chen hiro yuki kenji sofia mateo santiago diego carlos luis miguel jorge javier ana elena ivan olga sergei dmitri raj priya amit sanjay anita deepak vijay arjun ananya kwame amara chidi ngozi jin min seo aaliyah malik jamal imani kofi sven lars anders ingrid freya spencer kevin"
+  )
+    .split(/\s+/)
+    .filter(Boolean)
+);
+
+/** Brand tokens from a domain ("aylus" from aylus.org) for matching org accounts. */
+function brandTokens(domain: string): Set<string> {
+  const labels = domain.toLowerCase().split(".");
+  labels.pop(); // drop the TLD
+  if (labels.length > 1 && ["co", "com", "org", "net", "gov", "edu", "ac"].includes(labels[labels.length - 1])) {
+    labels.pop(); // drop a 2nd-level suffix like the "co" in co.uk
+  }
+  const tokens = new Set<string>();
+  for (const label of labels) {
+    if (label === "www") continue;
+    for (const part of label.split("-")) if (part.length >= 3) tokens.add(part);
+  }
+  return tokens;
+}
+
+/** Does the local-part name a specific human (jane.smith, eric.justin.wu)? */
+function looksLikePerson(local: string): boolean {
+  return local
+    .split(/[._\-+]/)
+    .some((t) => COMMON_FIRST_NAMES.has(t.replace(/\d+$/, "")));
+}
+
+/**
+ * Classify one address as intentionally-published contact info vs personal data.
+ *
+ * The key signal is "does this name an individual?", NOT "is it on this domain?".
+ * A functional mailbox (complaints@fmc.gov, dial@…, kccdv@state.gov) is published
+ * on purpose no matter whose domain it's on, so it defaults to "contact". Only a
+ * personal-webmail account, or a local-part that clearly names a person, counts
+ * as personal exposure.
+ */
+export function classifyEmail(email: string, domain: string): EmailKind {
+  const [local = "", host = ""] = email.toLowerCase().split("@");
+  const brand = brandTokens(domain);
+
+  // An org account on free-mail (aylus.org@gmail) is still org contact info.
+  if (local.split(/[._\-]/).some((t) => t.length >= 3 && brand.has(t))) return "contact";
+
+  // Personal webmail → an individual's account (the real exposure).
+  if (FREE_MAIL.has(host)) return "personal";
+
+  // The org's own published address → expected.
+  if (host === domain || host === "www." + domain) return "contact";
+
+  // On any other org/corporate/gov domain, it's only "personal" if it actually
+  // names a person; a generic functional mailbox stays "contact".
+  return looksLikePerson(local) ? "personal" : "contact";
+}
+
 export interface BreachInfo {
   name: string;
   title: string;
