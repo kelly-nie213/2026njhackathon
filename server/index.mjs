@@ -5,6 +5,7 @@ import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { crawlDomain } from "./crawl.mjs";
 import { checkEmails } from "./breachlookup.mjs";
+import { runSecurityScan } from "./securityscan.mjs";
 
 const PORT = process.env.PORT || 8787;
 const MODEL = "claude-opus-4-8";
@@ -286,6 +287,25 @@ app.post("/api/action-plan", async (req, res) => {
   } catch (err) {
     console.error("action-plan error:", err?.message || err);
     res.status(502).json({ error: "ai_error" });
+  }
+});
+
+// Run the 7 free-source live security scan against a domain.
+app.post("/api/security-scan", async (req, res) => {
+  const { domain } = req.body ?? {};
+  if (!domain || typeof domain !== "string") {
+    return res.status(400).json({ error: "domain_required" });
+  }
+  const clean = domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "").toLowerCase();
+  if (!clean || !/^[a-z0-9.\-]+\.[a-z]{2,}$/i.test(clean)) {
+    return res.status(400).json({ error: "invalid_domain" });
+  }
+  try {
+    const result = await runSecurityScan(clean);
+    res.json(result);
+  } catch (err) {
+    console.error("security-scan error:", err?.message || err);
+    res.status(500).json({ error: "scan_error" });
   }
 });
 

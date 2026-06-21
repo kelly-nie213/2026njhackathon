@@ -58,6 +58,36 @@ export interface LikelyAttack {
   whoAtRisk: string[];
 }
 
+/** A finding produced by the live 7-source security scan (no simulation). */
+export interface LiveFinding {
+  id: string;
+  category: string;
+  severity: Severity;
+  title: string;
+  detail: string;
+  evidence: string;
+  source: string;
+}
+
+export interface LiveScanMeta {
+  emailProvider: string | null;
+  ip: string | null;
+  domainExpiryDays: number | null;
+  subdomainCount: number;
+  sensitiveSubdomains: string[];
+  openPorts: number[];
+  cves: string[];
+  exposedPaths: { path: string; label: string }[];
+  isHTTPS: boolean;
+}
+
+export interface LiveScanData {
+  domain: string;
+  scannedAt: string;
+  findings: LiveFinding[];
+  meta: LiveScanMeta;
+}
+
 export interface ScanResult {
   input: ScanInput;
   scannedAt: string;

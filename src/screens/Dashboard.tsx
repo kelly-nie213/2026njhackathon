@@ -15,11 +15,11 @@ import { InterconnectionMap } from "../components/InterconnectionMap";
 import { useScan } from "../store";
 import { SEVERITY_META } from "../lib/scan";
 import { generateActionPlan, type AiActionPlan } from "../lib/api";
-import type { DataAsset } from "../lib/types";
+import type { DataAsset, LiveFinding } from "../lib/types";
 
 export default function Dashboard() {
   const nav = useNavigate();
-  const { result, reset } = useScan();
+  const { result, reset, liveData, liveStatus } = useScan();
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const [aiPlan, setAiPlan] = useState<AiActionPlan | null>(null);
   const [planSource, setPlanSource] = useState<"ai" | "fallback" | null>(null);
@@ -291,6 +291,9 @@ export default function Dashboard() {
           </Reveal>
         </div>
 
+        {/* LIVE SCAN RESULTS */}
+        <LiveScanCard liveStatus={liveStatus} liveData={liveData} />
+
         {/* ACTION PLAN — what to do next */}
         <Reveal className="card card-glow p-6">
           <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -379,6 +382,179 @@ function Stat({
       </div>
       <div className="mt-1 text-[11px] text-muted">{sub}</div>
     </Reveal>
+  );
+}
+
+function LiveScanCard({
+  liveStatus,
+  liveData,
+}: {
+  liveStatus: "idle" | "scanning" | "done" | "error";
+  liveData: import("../lib/types").LiveScanData | null;
+}) {
+  if (liveStatus === "idle") return null;
+
+  return (
+    <Reveal className="card p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-bold">Live Internet Scan</h2>
+        {liveStatus === "scanning" && (
+          <span className="flex items-center gap-1.5 rounded-full bg-brand-500/15 px-3 py-1 text-xs font-semibold text-brand-300">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-400" />
+            Scanning now…
+          </span>
+        )}
+        {liveStatus === "done" && liveData && (
+          <span className="flex items-center gap-1.5 rounded-full bg-risk-crit/15 px-3 py-1 text-xs font-semibold text-risk-high">
+            <span className="h-1.5 w-1.5 rounded-full bg-risk-crit" />
+            LIVE
+          </span>
+        )}
+        {liveStatus === "error" && (
+          <span className="rounded-full bg-white/8 px-3 py-1 text-xs text-muted">
+            Scan unavailable — server may be offline
+          </span>
+        )}
+        {liveData && (
+          <span className="ml-auto text-[11px] text-muted">
+            Scanned {new Date(liveData.scannedAt).toLocaleTimeString()} via Cloudflare DNS · crt.sh · Shodan · RDAP
+          </span>
+        )}
+      </div>
+
+      {liveStatus === "scanning" && (
+        <div className="space-y-2">
+          {["Checking email security (DMARC/SPF/DKIM)…", "Probing HTTP security headers…", "Searching certificate transparency logs…", "Querying Shodan InternetDB…", "Checking domain expiry via RDAP…", "Probing for exposed sensitive paths…", "Analyzing robots.txt…"].map((t, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 rounded-lg border border-white/6 bg-white/[0.02] px-3 py-2 text-xs text-muted"
+              style={{ animationDelay: `${i * 0.15}s` }}
+            >
+              <span className="h-1 w-1 animate-pulse rounded-full bg-brand-400" style={{ animationDelay: `${i * 0.2}s` }} />
+              {t}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {liveStatus === "done" && liveData && (
+        <>
+          {liveData.meta && (
+            <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {liveData.meta.emailProvider && (
+                <MetaPill icon="📧" label="Email" value={liveData.meta.emailProvider} />
+              )}
+              {liveData.meta.ip && (
+                <MetaPill icon="🌐" label="IP" value={liveData.meta.ip} />
+              )}
+              {liveData.meta.domainExpiryDays !== null && (
+                <MetaPill
+                  icon="📅"
+                  label="Domain expiry"
+                  value={
+                    liveData.meta.domainExpiryDays < 0
+                      ? "Expired!"
+                      : `${liveData.meta.domainExpiryDays}d`
+                  }
+                  danger={liveData.meta.domainExpiryDays < 60}
+                />
+              )}
+              <MetaPill
+                icon="🔒"
+                label="HTTPS"
+                value={liveData.meta.isHTTPS ? "Yes" : "No — insecure!"}
+                danger={!liveData.meta.isHTTPS}
+              />
+              {liveData.meta.subdomainCount > 0 && (
+                <MetaPill icon="🗺️" label="Subdomains" value={`${liveData.meta.subdomainCount} found`} />
+              )}
+              {liveData.meta.openPorts.length > 0 && (
+                <MetaPill icon="🔌" label="Open ports" value={liveData.meta.openPorts.slice(0, 5).join(", ")} />
+              )}
+              {liveData.meta.cves.length > 0 && (
+                <MetaPill icon="☠️" label="Known CVEs" value={`${liveData.meta.cves.length} vulnerabilities`} danger />
+              )}
+              {liveData.meta.exposedPaths.length > 0 && (
+                <MetaPill icon="🚨" label="Exposed paths" value={`${liveData.meta.exposedPaths.length} found`} danger />
+              )}
+            </div>
+          )}
+
+          {liveData.findings.length === 0 ? (
+            <div className="rounded-xl border border-risk-low/30 bg-risk-low/10 px-4 py-5 text-center">
+              <div className="text-2xl">✅</div>
+              <div className="mt-1 font-semibold text-risk-low">No live issues found</div>
+              <div className="mt-1 text-xs text-muted">
+                All 7 public checks passed — great job on the basics.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {liveData.findings.map((f) => (
+                <LiveFindingRow key={f.id} f={f} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </Reveal>
+  );
+}
+
+function MetaPill({
+  icon,
+  label,
+  value,
+  danger = false,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  danger?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-2 text-xs"
+      style={{
+        borderColor: danger ? "rgba(244,63,94,0.3)" : "rgba(255,255,255,0.08)",
+        background: danger ? "rgba(244,63,94,0.08)" : "rgba(255,255,255,0.02)",
+      }}
+    >
+      <div className="text-muted">{icon} {label}</div>
+      <div
+        className="mt-0.5 font-semibold"
+        style={{ color: danger ? "var(--color-risk-high)" : "var(--color-fg)" }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function LiveFindingRow({ f }: { f: LiveFinding }) {
+  const m = SEVERITY_META[f.severity];
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+      <div className="flex flex-wrap items-start gap-2">
+        <span
+          className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+          style={{ color: m.color, background: m.bg }}
+        >
+          {m.label}
+        </span>
+        <span className="flex items-center gap-1 rounded-full bg-risk-crit/12 px-2 py-0.5 text-[11px] font-semibold text-risk-high">
+          ● LIVE
+        </span>
+        <span className="rounded-full border border-white/8 px-2 py-0.5 text-[11px] text-muted">
+          {f.source}
+        </span>
+      </div>
+      <div className="mt-2 font-semibold">{f.title}</div>
+      <p className="mt-1 text-sm text-muted">{f.detail}</p>
+      <div className="mt-2 rounded-lg bg-ink-900/60 px-3 py-1.5 font-mono text-[11px] text-brand-300">
+        {f.evidence}
+      </div>
+    </div>
   );
 }
 
