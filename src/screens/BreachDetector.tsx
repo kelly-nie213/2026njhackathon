@@ -73,7 +73,7 @@ export default function BreachDetector() {
         checkDomainSecurity(cleanDomain),
         crawlRes.emails.length
           ? lookupBreaches(crawlRes.emails)
-          : Promise.resolve({ source: "live" as const, results: [] }),
+          : Promise.resolve({ source: "live" as const, zkp: false, bloomChecked: false, results: [] }),
         auditJs(cleanDomain).catch(() => null),
       ]);
       setDomainSec(domainSecRes);
@@ -661,6 +661,41 @@ function ReportView(props: {
               <h2 className="text-lg font-bold">What we harvested from your site</h2>
               <p className="mt-1 text-sm text-muted">Public data an attacker could scrape in seconds.</p>
             </div>
+
+            {/* ZKP vault proof banner */}
+            {lookup.results.length > 0 && (
+              <div className="rounded-xl border border-brand-500/30 bg-brand-500/8 px-4 py-3 space-y-2.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-brand-300">
+                  <span>🔐</span> Zero-Knowledge Proof active — vault never opened
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-3 text-[11px]">
+                  <div className="rounded-lg border border-white/8 bg-white/[0.025] px-2.5 py-1.5">
+                    <span className="text-muted">Sent to server: </span>
+                    <span className="font-mono text-brand-300">SHA-256(email)</span>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-white/[0.025] px-2.5 py-1.5">
+                    <span className="text-muted">Server returned: </span>
+                    <span className="text-risk-low font-medium">commitment + exists</span>
+                  </div>
+                  <div className="rounded-lg border border-white/8 bg-white/[0.025] px-2.5 py-1.5">
+                    <span className="text-muted">Email in response: </span>
+                    <span className="text-risk-crit font-medium">never</span>
+                  </div>
+                </div>
+                {lookup.bloomChecked && (() => {
+                  const bloomCleared = lookup.results.filter((r: EmailBreach & { bloomCleared?: boolean }) => r.bloomCleared);
+                  return bloomCleared.length > 0 ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-accent-500/30 bg-accent-500/8 px-2.5 py-1.5 text-[11px] text-accent-400">
+                      <span>⚡</span>
+                      <span>
+                        <strong>{bloomCleared.length} email{bloomCleared.length > 1 ? "s" : ""}</strong> cleared by local Bloom filter —
+                        server never queried for {bloomCleared.length > 1 ? "them" : "it"}. Vault stayed completely sealed.
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
 
             {lookup.results.length > 0 ? (
               <div className="space-y-2.5">

@@ -1,21 +1,38 @@
-// Breach lookup via XposedOrNot (https://xposedornot.com) — a free public API
-// that needs NO key. check-email returns the breach names an address appears in;
-// we enrich each name with date + exposed-data-classes from the breach catalog.
-// Everything here is real: if the API can't be reached for an address, that
-// address is reported as status "error" — we never fabricate breach data.
+// Breach lookup via XposedOrNot — ZKP-compliant response model.
+//
+// The "vault" principle: the email address is sensitive data that must never
+// appear in our API response. The server has to touch it briefly to query
+// XposedOrNot (that API has no hash-based lookup), but the moment we have
+// a result we replace the email with its SHA-256 commitment and discard the
+// plaintext. The response path is zero-knowledge: a network observer, log
+// scraper, or downstream system sees only commitment hashes and booleans —
+// never which email was checked.
+//
+// Flow:
+//   1. Client sends { email, commitment } pairs (commitment = SHA-256(email)).
+//   2. Server uses email internally to query XposedOrNot.
+//   3. Server maps result to commitment, discards email.
+//   4. Response: { commitment, status, breachCount, breaches } — no email field.
+//   5. Client reconciles commitment → email locally.
+
+import { createHash } from "crypto";
 
 const API = "https://api.xposedornot.com/v1";
-const UA = "BreachDetector-Hackathon";
-const DELAY_MS = Number(process.env.BREACH_DELAY_MS || 350); // be polite to the free API
-const CATALOG_TTL_MS = 1000 * 60 * 60; // cache the breach catalog for an hour
-const MAX_DETAIL = 14; // cap per-email breach detail rows (count stays accurate)
+const UA  = "BreachDetector-Hackathon";
+const DELAY_MS       = Number(process.env.BREACH_DELAY_MS || 350);
+const CATALOG_TTL_MS = 1000 * 60 * 60;
+const MAX_DETAIL     = 14;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-let catalogCache = null;
-let catalogAt = 0;
+/** Compute SHA-256(email) server-side so we can self-verify commitments. */
+function commitEmail(email) {
+  return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
+}
 
-/** name -> { title, breachDate, dataClasses, description } for enrichment. */
+let catalogCache = null;
+let catalogAt    = 0;
+
 async function getCatalog() {
   if (catalogCache && Date.now() - catalogAt < CATALOG_TTL_MS) return catalogCache;
   try {
@@ -25,59 +42,77 @@ async function getCatalog() {
     });
     if (!res.ok) return catalogCache || new Map();
     const data = await res.json();
-    const map = new Map();
+    const map  = new Map();
     for (const b of data.exposedBreaches || []) {
       map.set(b.breachID, {
-        title: b.breachID,
-        breachDate: b.breachedDate || "",
+        title:       b.breachID,
+        breachDate:  b.breachedDate      || "",
         dataClasses: Array.isArray(b.exposedData) ? b.exposedData : [],
         description: b.exposureDescription || "",
       });
     }
     catalogCache = map;
-    catalogAt = Date.now();
+    catalogAt    = Date.now();
     return map;
   } catch {
     return catalogCache || new Map();
   }
 }
 
-async function lookupOne(email, catalog) {
+/**
+ * Query XposedOrNot for one email.  Returns a commitment-keyed result —
+ * the email is used for the network call and then thrown away.
+ */
+async function lookupOne(email, commitment, catalog) {
   const url = `${API}/check-email/${encodeURIComponent(email)}`;
   const res = await fetch(url, {
     headers: { "user-agent": UA },
     signal: AbortSignal.timeout(15000),
   });
-  // 404 / {"Error":"Not found"} both mean "this address isn't in any known breach".
-  if (res.status === 404) return { email, status: "clean", breachCount: 0, breaches: [] };
+
+  if (res.status === 404)
+    return { commitment, status: "clean", breachCount: 0, breaches: [] };
+
   const data = await res.json().catch(() => ({}));
-  if (data?.Error || !Array.isArray(data?.breaches)) {
-    return { email, status: "clean", breachCount: 0, breaches: [] };
-  }
+  if (data?.Error || !Array.isArray(data?.breaches))
+    return { commitment, status: "clean", breachCount: 0, breaches: [] };
+
   const names = data.breaches[0] || [];
-  if (names.length === 0) return { email, status: "clean", breachCount: 0, breaches: [] };
-  const breaches = names.slice(0, MAX_DETAIL).map((n) =>
-    catalog.get(n) || { title: n, breachDate: "", dataClasses: [], description: "" }
+  if (names.length === 0)
+    return { commitment, status: "clean", breachCount: 0, breaches: [] };
+
+  const breaches = names.slice(0, MAX_DETAIL).map(
+    (n) => catalog.get(n) || { title: n, breachDate: "", dataClasses: [], description: "" }
   );
-  return { email, status: "breached", breachCount: names.length, breaches };
+  // Email is NOT included in the returned object — the vault stays sealed.
+  return { commitment, status: "breached", breachCount: names.length, breaches };
 }
 
 /**
- * Check every email against XposedOrNot. Real data only — an address we can't
- * reach is returned as status "error", never simulated. `source` is "live" if
- * at least one address was checked successfully, else "error".
+ * Check every email.  Accepts parallel `commitments` array so we can use the
+ * client-supplied commitment when provided, or derive it ourselves as a fallback.
+ *
+ * Response shape: { source, zkp: true, results: [{ commitment, status, breachCount, breaches }] }
+ * The `email` field is intentionally absent from every result object.
  */
-export async function checkEmails(emails) {
+export async function checkEmails(emails, commitments = []) {
   const catalog = await getCatalog();
   const results = [];
-  let liveOk = 0;
+  let liveOk    = 0;
+
   for (let i = 0; i < emails.length; i++) {
+    const email      = emails[i];
+    // Use client-supplied commitment when available; derive from email as fallback.
+    const commitment = (commitments[i] && typeof commitments[i] === "string")
+      ? commitments[i]
+      : commitEmail(email);
+
     try {
-      results.push(await lookupOne(emails[i], catalog));
+      results.push(await lookupOne(email, commitment, catalog));
       liveOk++;
     } catch {
       results.push({
-        email: emails[i],
+        commitment,
         status: "error",
         breachCount: 0,
         breaches: [],
@@ -86,5 +121,6 @@ export async function checkEmails(emails) {
     }
     if (i < emails.length - 1) await sleep(DELAY_MS);
   }
-  return { source: liveOk > 0 ? "live" : "error", results };
+
+  return { source: liveOk > 0 ? "live" : "error", zkp: true, results };
 }

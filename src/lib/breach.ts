@@ -3,6 +3,7 @@
 // no Anthropic key is configured.
 
 import type { Severity } from "./types";
+import { checkCommitmentLocally } from "./bloom";
 
 export interface CrawlResult {
   domain: string;
@@ -22,6 +23,7 @@ export interface BreachInfo {
 
 export interface EmailBreach {
   email: string;
+  commitment: string; // SHA-256(email) — what the server actually saw
   status: "breached" | "clean" | "error";
   breachCount: number;
   breaches: BreachInfo[];
@@ -30,6 +32,8 @@ export interface EmailBreach {
 
 export interface BreachLookup {
   source: "live" | "error";
+  zkp: boolean;          // true when server response contained no plaintext emails
+  bloomChecked: boolean; // true if we ran the local Bloom filter first
   results: EmailBreach[];
 }
 
@@ -100,14 +104,85 @@ export async function crawlDomain(domain: string): Promise<CrawlResult> {
   return res.json();
 }
 
+/** SHA-256 of a normalized email — matches what the server computes. */
+async function commitEmail(email: string): Promise<string> {
+  const data = new TextEncoder().encode(email.toLowerCase().trim());
+  const buf  = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export async function lookupBreaches(emails: string[]): Promise<BreachLookup> {
+  // Phase 1 — hash every email in the browser before anything leaves.
+  const commitments = await Promise.all(emails.map(commitEmail));
+
+  // Phase 4 — check the local Bloom filter first.
+  // "Definitely not breached" → skip those emails entirely (vault stays sealed).
+  // "Probably breached" / "unknown" → pass to server for confirmation.
+  const localResults = await Promise.all(
+    commitments.map((c) => checkCommitmentLocally(c))
+  );
+  const bloomChecked = localResults.some((r) => r !== null);
+
+  // Only send emails the filter didn't definitively clear.
+  const toCheck        = emails.filter((_, i) => localResults[i] !== false);
+  const toCheckCommits = commitments.filter((_, i) => localResults[i] !== false);
+
+  // Emails cleared by the filter get clean results immediately — no server query.
+  const filterResults: EmailBreach[] = emails
+    .filter((_, i) => localResults[i] === false)
+    .map((email) => ({
+      email,
+      commitment:   commitments[emails.indexOf(email)],
+      status:       "clean" as const,
+      breachCount:  0,
+      breaches:     [],
+      bloomCleared: true,
+    }));
+
+  if (toCheck.length === 0) {
+    // Every email cleared locally — server never queried.
+    return { source: "live", zkp: true, bloomChecked, results: filterResults };
+  }
+
   const res = await fetch("/api/breaches", {
-    method: "POST",
+    method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ emails }),
+    body:    JSON.stringify({ emails: toCheck, commitments: toCheckCommits }),
   });
   if (!res.ok) throw new Error("breach_lookup_failed");
-  return res.json();
+
+  const raw = await res.json() as {
+    source: "live" | "error";
+    zkp: boolean;
+    results: Array<{
+      commitment: string;
+      status: "breached" | "clean" | "error";
+      breachCount: number;
+      breaches: BreachInfo[];
+      error?: string;
+    }>;
+  };
+
+  // Reconcile commitment → email locally.
+  const commitToEmail = new Map(toCheckCommits.map((c, i) => [c, toCheck[i]]));
+
+  const serverResults: EmailBreach[] = raw.results.map((r) => ({
+    email:       commitToEmail.get(r.commitment) ?? "[unknown]",
+    commitment:  r.commitment,
+    status:      r.status,
+    breachCount: r.breachCount,
+    breaches:    r.breaches,
+    ...(r.error ? { error: r.error } : {}),
+  }));
+
+  return {
+    source:       raw.source,
+    zkp:          raw.zkp ?? false,
+    bloomChecked,
+    results:      [...filterResults, ...serverResults],
+  };
 }
 
 /** AI report with a deterministic fallback when no key / endpoint is up. */

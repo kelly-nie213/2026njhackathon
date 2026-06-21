@@ -6,7 +6,9 @@ const NAV_ITEMS = [
   { path: "/phishing",   label: "Phishing Checker", icon: "✉️" },
   { path: "/triage",     label: "Incident Triage",  icon: "⚡" },
   { path: "/code-audit", label: "Code Auditor",     icon: "</>" },
-  { path: "/learn",      label: "Learn & Protect",  icon: "🛡️" },
+  { path: "/tiam",        label: "TIAM & ZKP",       icon: "🗝️" },
+  { path: "/credentials", label: "Credential Check", icon: "🔑" },
+  { path: "/learn",       label: "Learn & Protect",  icon: "🛡️" },
 ];
 
 export function Nav() {
