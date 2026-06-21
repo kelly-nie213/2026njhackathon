@@ -39,7 +39,7 @@ Try the **"aylus.org"** link on the Breach Detector for a live demo against a re
 cp .env.example .env       # then add your ANTHROPIC_API_KEY
 ```
 
-The breach lookup and crawl need **no key** (they use XposedOrNot's free public API). Without an
+The breach lookup and crawl need **no key** (they use LeakCheck's free public API). Without an
 Anthropic key the AI features still work: the phishing checker falls back to a built-in heuristic,
 and the breach/triage reports use deterministic plain-language plans — so a demo never breaks.
 
@@ -49,5 +49,5 @@ and the breach/triage reports use deterministic plain-language plans — so a de
 - **Claude** (`claude-opus-4-8`, adaptive thinking, structured outputs) via a tiny Express proxy
   in [server/index.mjs](server/index.mjs) that keeps the API key server-side
 - Live website crawl in [server/crawl.mjs](server/crawl.mjs) (read-only, public pages only) and
-  breach lookups via **XposedOrNot** in [server/breachlookup.mjs](server/breachlookup.mjs) — no key needed
+  breach lookups via **LeakCheck** in [server/breachlookup.mjs](server/breachlookup.mjs) — no key needed
 - Graceful AI fallbacks in [src/lib/api.ts](src/lib/api.ts) and [src/lib/breach.ts](src/lib/breach.ts)

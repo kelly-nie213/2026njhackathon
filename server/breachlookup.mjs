@@ -1,89 +1,125 @@
-// Breach lookup via XposedOrNot (https://xposedornot.com) — a free public API
-// that needs NO key. check-email returns the breach names an address appears in;
-// we enrich each name with date + exposed-data-classes from the breach catalog.
-// Everything here is real: if the API can't be reached for an address, that
-// address is reported as status "error" — we never fabricate breach data.
+// Breach lookup via LeakCheck (https://leakcheck.io) public API — free, NO key.
+//   GET /api/public?check=<email>
+//   breached -> {"success":true,"found":N,"fields":[...],"sources":[{name,date}]}
+//   clean    -> {"success":false,"error":"Not found"}   (HTTP 200)
+// `fields` lists the kinds of data exposed across the breaches (password, id,
+// phone, ssn, ...). Everything here is real: an address we can't check is
+// reported as status "error" — we never fabricate breach data.
+//
+// (Switched off XposedOrNot: its keyless API aggressively rate-limited our IP
+// and HIBP's email API requires a paid key. LeakCheck's public endpoint is free.)
 
-const API = "https://api.xposedornot.com/v1";
+const API = "https://leakcheck.io/api/public";
 const UA = "BreachDetector-Hackathon";
 const DELAY_MS = Number(process.env.BREACH_DELAY_MS || 350); // be polite to the free API
-const CATALOG_TTL_MS = 1000 * 60 * 60; // cache the breach catalog for an hour
-const MAX_DETAIL = 14; // cap per-email breach detail rows (count stays accurate)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-let catalogCache = null;
-let catalogAt = 0;
+// LeakCheck `fields` are terse machine names; humanize the common ones for the UI.
+const FIELD_LABELS = {
+  password: "Passwords",
+  id: "Account ID",
+  username: "Usernames",
+  name: "Full name",
+  first_name: "First name",
+  last_name: "Last name",
+  middle_name: "Middle name",
+  profile_name: "Profile name",
+  email: "Email addresses",
+  phone: "Phone numbers",
+  address: "Physical addresses",
+  city: "City",
+  state: "State",
+  zip: "ZIP code",
+  country: "Country",
+  dob: "Date of birth",
+  gender: "Gender",
+  ssn: "Social Security numbers",
+  ip: "IP addresses",
+  ip1: "IP addresses",
+  ip2: "IP addresses",
+  origin: "Account origin",
+  company_name: "Employer",
+};
 
-/** name -> { title, breachDate, dataClasses, description } for enrichment. */
-async function getCatalog() {
-  if (catalogCache && Date.now() - catalogAt < CATALOG_TTL_MS) return catalogCache;
-  try {
-    const res = await fetch(`${API}/breaches`, {
-      headers: { "user-agent": UA },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) return catalogCache || new Map();
-    const data = await res.json();
-    const map = new Map();
-    for (const b of data.exposedBreaches || []) {
-      map.set(b.breachID, {
-        title: b.breachID,
-        breachDate: b.breachedDate || "",
-        dataClasses: Array.isArray(b.exposedData) ? b.exposedData : [],
-        description: b.exposureDescription || "",
-      });
-    }
-    catalogCache = map;
-    catalogAt = Date.now();
-    return map;
-  } catch {
-    return catalogCache || new Map();
+function humanizeFields(fields) {
+  const out = [];
+  for (const f of Array.isArray(fields) ? fields : []) {
+    const label = FIELD_LABELS[f] || f.replace(/_/g, " ");
+    if (!out.includes(label)) out.push(label);
   }
+  return out;
 }
 
-async function lookupOne(email, catalog) {
-  const url = `${API}/check-email/${encodeURIComponent(email)}`;
+async function lookupOne(email) {
+  const url = `${API}?check=${encodeURIComponent(email)}`;
   const res = await fetch(url, {
-    headers: { "user-agent": UA },
+    headers: { "user-agent": UA, accept: "application/json" },
     signal: AbortSignal.timeout(15000),
   });
-  // 404 / {"Error":"Not found"} both mean "this address isn't in any known breach".
-  if (res.status === 404) return { email, status: "clean", breachCount: 0, breaches: [] };
+  // Non-OK status (429 rate-limit, 5xx, ...) is a failure to check, NOT a clean
+  // result — throw so the caller records it as "error", never a false "no breach".
+  if (!res.ok) throw new Error(`leakcheck ${res.status}`);
   const data = await res.json().catch(() => ({}));
-  if (data?.Error || !Array.isArray(data?.breaches)) {
-    return { email, status: "clean", breachCount: 0, breaches: [] };
+
+  if (data?.success === true) {
+    const dataClasses = humanizeFields(data.fields);
+    const sources = Array.isArray(data.sources) ? data.sources : [];
+    const breaches = sources.map((s) => ({
+      title: s.name || "Unknown source",
+      breachDate: s.date ? `${s.date}-01`.slice(0, 10) : "",
+      dataClasses,
+      description: "",
+    }));
+    return {
+      email,
+      status: "breached",
+      breachCount: typeof data.found === "number" ? data.found : breaches.length,
+      breaches,
+    };
   }
-  const names = data.breaches[0] || [];
-  if (names.length === 0) return { email, status: "clean", breachCount: 0, breaches: [] };
-  const breaches = names.slice(0, MAX_DETAIL).map((n) =>
-    catalog.get(n) || { title: n, breachDate: "", dataClasses: [], description: "" }
-  );
-  return { email, status: "breached", breachCount: names.length, breaches };
+
+  // success:false with "Not found" => genuinely clean. Any other error (e.g.
+  // "Too many requests", "Invalid email") is a failed check, not a clean one.
+  const err = String(data?.error || "");
+  if (/not found/i.test(err)) return { email, status: "clean", breachCount: 0, breaches: [] };
+  throw new Error(err || "unexpected response");
 }
 
 /**
- * Check every email against XposedOrNot. Real data only — an address we can't
+ * Check every email against LeakCheck. Real data only — an address we can't
  * reach is returned as status "error", never simulated. `source` is "live" if
  * at least one address was checked successfully, else "error".
  */
 export async function checkEmails(emails) {
-  const catalog = await getCatalog();
   const results = [];
   let liveOk = 0;
   for (let i = 0; i < emails.length; i++) {
-    try {
-      results.push(await lookupOne(emails[i], catalog));
-      liveOk++;
-    } catch {
-      results.push({
-        email: emails[i],
-        status: "error",
-        breachCount: 0,
-        breaches: [],
-        error: "lookup_failed",
-      });
+    let result = null;
+    // Retry transient failures (429 rate-limit / 5xx) with exponential backoff
+    // before giving up and recording the address as "error".
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        result = await lookupOne(emails[i]);
+        liveOk++;
+        break;
+      } catch (e) {
+        const msg = String(e?.message);
+        const rateLimited = /\b429\b|too many requests/i.test(msg);
+        if (attempt < 2 && rateLimited) {
+          await sleep(DELAY_MS * Math.pow(3, attempt + 1)); // ~1s, ~3s
+          continue;
+        }
+        result = {
+          email: emails[i],
+          status: "error",
+          breachCount: 0,
+          breaches: [],
+          error: rateLimited ? "rate_limited" : "lookup_failed",
+        };
+      }
     }
+    results.push(result);
     if (i < emails.length - 1) await sleep(DELAY_MS);
   }
   return { source: liveOk > 0 ? "live" : "error", results };
