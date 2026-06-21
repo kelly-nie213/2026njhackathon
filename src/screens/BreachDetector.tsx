@@ -27,6 +27,7 @@ import {
   type JsFinding,
 } from "../lib/jsaudit";
 import { askAdvisor, type AdvisorProfile, type ChatMessage } from "../lib/api";
+import { BadgeCard } from "../components/BadgeCard";
 
 type Phase = "input" | "scanning" | "report";
 
@@ -559,6 +560,22 @@ function ReportView(props: {
         <Stat label="Total breach hits"      value={totalB}                                    accent="crit" />
         <Stat label="Names & phones exposed" value={crawl.names.length + crawl.phones.length} accent="med"  />
       </div>
+
+      {/* Verifiable badge — prove the grade without publishing the report */}
+      <BadgeCard
+        domain={crawl.domain}
+        orgName={orgName}
+        summary={{
+          webGrade: webSec?.grade,
+          webChecks: webSec?.checks.map((c) => ({ status: c.status, severity: c.severity })),
+          spoofable: domainSec?.spoofable,
+          domainWorst: domainSec?.worst,
+          reputationFlagged: reputation?.flagged,
+          breachedAccounts: breachedCount,
+          jsCounts: jsAudit?.counts,
+          exposedEmails: crawl.emails.length,
+        }}
+      />
 
       {/* ── Tab bar (sticky so switching is always reachable & visible) ── */}
       <div ref={tabsRef} className="card sticky top-3 z-20 flex gap-1.5 p-1.5 scroll-mt-3">

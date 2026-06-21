@@ -9,6 +9,7 @@ import { auditDomainJs } from "./jsaudit.mjs";
 import { checkDomainSecurity } from "./domaincheck.mjs";
 import { checkWebSecurity } from "./webheaders.mjs";
 import { checkReputation } from "./reputation.mjs";
+import { issueCredential, deriveBadge, verifyBadge, renderSvg, issuer } from "./badge.mjs";
 
 const PORT = process.env.PORT || 8787;
 const MODEL = "claude-opus-4-8";
@@ -91,6 +92,59 @@ const BREACH_REPORT_SCHEMA = {
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, ai: hasKey, breaches: "xposedornot" });
+});
+
+/* ───────────────────── verifiable security-health badge ─────────────────── */
+
+// Issue a signed, selectively-disclosable badge from a completed scan summary.
+// The server scores the scan itself so a badge can't be self-awarded.
+app.post("/api/badge/issue", (req, res) => {
+  const { domain, orgName, summary, reveal } = req.body ?? {};
+  if (!domain || typeof domain !== "string") {
+    return res.status(400).json({ error: "domain_required" });
+  }
+  try {
+    const credential = issueCredential({ domain, orgName, summary: summary || {} });
+    const { badge, token } = deriveBadge(credential, Array.isArray(reveal) && reveal.length ? reveal : undefined);
+    res.json({
+      grade: credential.grade,
+      score: credential.score,
+      issuedAt: credential.issuedAt,
+      expiresAt: credential.expiresAt,
+      kid: credential.kid,
+      token,
+      badge,
+      credential, // full private credential — the org keeps this to re-derive badges
+    });
+  } catch (err) {
+    console.error("badge issue error:", err?.message || err);
+    res.status(500).json({ error: "issue_error" });
+  }
+});
+
+// Verify a badge token against Aegis's public key. Offline-equivalent: callers
+// can also fetch /api/badge/pubkey and run the same checks themselves.
+app.post("/api/badge/verify", (req, res) => {
+  const { token, requireGrade } = req.body ?? {};
+  if (!token || typeof token !== "string") {
+    return res.status(400).json({ error: "token_required" });
+  }
+  res.json(verifyBadge(token, requireGrade ? { requireGrade } : {}));
+});
+
+// Public issuer key, so any third party can verify badges independently.
+app.get("/api/badge/pubkey", (_req, res) => {
+  const iss = issuer();
+  res.json({ kid: iss.kid, alg: iss.alg, publicKeyPem: iss.publicKeyPem });
+});
+
+// Embeddable badge image: <img src="/api/badge/svg?token=..."> on the org's site.
+app.get("/api/badge/svg", (req, res) => {
+  const token = String(req.query.token || "");
+  const requireGrade = req.query.min ? String(req.query.min) : undefined;
+  res.setHeader("content-type", "image/svg+xml; charset=utf-8");
+  res.setHeader("cache-control", "no-cache");
+  res.send(renderSvg(token, requireGrade ? { requireGrade } : {}));
 });
 
 // BreachDetector: crawl a domain for public emails/names/phone numbers.

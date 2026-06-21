@@ -3,6 +3,7 @@ import BreachDetector from "./screens/BreachDetector";
 import PhishingChecker from "./screens/PhishingChecker";
 import IncidentTriage from "./screens/IncidentTriage";
 import LearnMore from "./screens/LearnMore";
+import VerifyBadge from "./screens/VerifyBadge";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Route path="/phishing"   element={<PhishingChecker />} />
         <Route path="/triage"     element={<IncidentTriage />} />
         <Route path="/learn"      element={<LearnMore />} />
+        <Route path="/verify"     element={<VerifyBadge />} />
         {/* code audit now lives inside the breach scan — keep the path working */}
         <Route path="/code-audit" element={<Navigate to="/" replace />} />
         <Route path="/breachdetector" element={<Navigate to="/" replace />} />

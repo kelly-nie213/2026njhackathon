@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { path: "/",         label: "Breach Detector",  short: "Scan" },
   { path: "/phishing", label: "Phishing Checker", short: "Phishing" },
   { path: "/triage",   label: "Incident Triage",  short: "Triage" },
+  { path: "/verify",   label: "Verify Badge",     short: "Verify" },
   { path: "/learn",    label: "Learn & Protect",  short: "Learn" },
 ];
 
