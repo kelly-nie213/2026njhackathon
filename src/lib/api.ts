@@ -1,4 +1,3 @@
-import type { ScanResult } from "./types";
 import type { TriageResult } from "./triage";
 
 export interface PhishingVerdict {
@@ -9,11 +8,6 @@ export interface PhishingVerdict {
   explanation: string;
   recommendedAction: string;
   source: "ai" | "heuristic";
-}
-
-export interface AiActionPlan {
-  summary: string;
-  steps: { title: string; why: string; effort: string; steps: string[] }[];
 }
 
 /* ---------- Phishing checker (AI with heuristic fallback) ---------- */
@@ -81,52 +75,6 @@ function heuristicPhishing(message: string): PhishingVerdict {
         ? "Do NOT click links or send anything. Call the supposed sender on a number you already have (not one from this message) to confirm."
         : "If anything feels off, confirm with the sender through a channel you already trust before acting.",
     source: "heuristic",
-  };
-}
-
-/* ---------- AI action plan (with deterministic fallback) ---------- */
-
-export async function generateActionPlan(
-  result: ScanResult
-): Promise<{ plan: AiActionPlan; source: "ai" | "fallback" }> {
-  try {
-    const top = [...result.dataAssets]
-      .filter((a) => a.exposed)
-      .sort((a, b) => b.sensitivity - a.sensitivity)[0];
-    const res = await fetch("/api/action-plan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        orgName: result.input.orgName,
-        orgType: result.input.orgType,
-        domain: result.input.domain,
-        topConsequence: top?.consequence ?? result.dataAssets[0]?.consequence,
-        findings: result.findings.map((f) => ({
-          title: f.title,
-          severity: f.severity,
-          detail: f.detail,
-        })),
-      }),
-    });
-    if (res.ok) {
-      return { plan: await res.json(), source: "ai" };
-    }
-  } catch {
-    /* fall through */
-  }
-  // Fallback: reshape the deterministic plan already computed by the scan engine.
-  return {
-    source: "fallback",
-    plan: {
-      summary:
-        "Here's your prioritized plan. The first two steps stop the majority of attacks on their own — start there.",
-      steps: result.actionPlan.map((s) => ({
-        title: s.title,
-        why: s.why,
-        effort: s.effort,
-        steps: s.steps,
-      })),
-    },
   };
 }
 

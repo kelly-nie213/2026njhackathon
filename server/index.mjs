@@ -38,29 +38,6 @@ const PHISHING_SCHEMA = {
   required: ["verdict", "confidence", "attackType", "redFlags", "explanation", "recommendedAction"],
 };
 
-const PLAN_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    summary: { type: "string" },
-    steps: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          title: { type: "string" },
-          why: { type: "string" },
-          effort: { type: "string" },
-          steps: { type: "array", items: { type: "string" } },
-        },
-        required: ["title", "why", "effort", "steps"],
-      },
-    },
-  },
-  required: ["summary", "steps"],
-};
-
 const TRIAGE_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -249,42 +226,6 @@ app.post("/api/phishing", async (req, res) => {
     res.json(parseJsonContent(result));
   } catch (err) {
     console.error("phishing error:", err?.message || err);
-    res.status(502).json({ error: "ai_error" });
-  }
-});
-
-// Turn raw scan findings into a personalized, plain-language action plan.
-app.post("/api/action-plan", async (req, res) => {
-  if (!client) return res.status(503).json({ error: "no_api_key" });
-  const { orgName, orgType, domain, findings, topConsequence } = req.body ?? {};
-  try {
-    const result = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: { type: "json_schema", schema: PLAN_SCHEMA } },
-      system:
-        "You advise small nonprofits with no IT staff or security budget. " +
-        "Given the results of a cyber health check, produce a prioritized, jargon-free action plan a volunteer can follow. " +
-        "Order steps so the highest-impact, easiest wins come first. " +
-        "Each step's 'why' must make the stakes concrete for this organization. Keep 'effort' to a short time estimate like '5 min' or '1 hour'.",
-      messages: [
-        {
-          role: "user",
-          content:
-            `Organization: ${orgName} (${orgType}), domain ${domain}.\n` +
-            `Most damaging exposure if leaked: ${topConsequence}\n\n` +
-            `Findings:\n` +
-            (findings || [])
-              .map((f) => `- [${f.severity}] ${f.title}: ${f.detail}`)
-              .join("\n") +
-            `\n\nWrite a short summary (2-3 sentences) and 4-6 ordered action steps.`,
-        },
-      ],
-    });
-    res.json(parseJsonContent(result));
-  } catch (err) {
-    console.error("action-plan error:", err?.message || err);
     res.status(502).json({ error: "ai_error" });
   }
 });
