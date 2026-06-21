@@ -239,11 +239,11 @@ export async function lookupBreaches(emails: string[]): Promise<BreachLookup> {
     }>;
   };
 
-  // Reconcile commitment → email locally.
-  const commitToEmail = new Map(toCheckCommits.map((c, i) => [c, toCheck[i]]));
-
-  const serverResults: EmailBreach[] = raw.results.map((r) => ({
-    email:       commitToEmail.get(r.commitment) ?? "[unknown]",
+  // Reconcile results → emails by position.
+  // The server processes emails in the order received and returns results in that
+  // same order, so result[i] corresponds to toCheck[i] — no commitment lookup needed.
+  const serverResults: EmailBreach[] = raw.results.map((r, i) => ({
+    email:       toCheck[i] ?? "[unknown]",
     commitment:  r.commitment,
     status:      r.status,
     breachCount: r.breachCount,
