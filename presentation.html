@@ -209,6 +209,37 @@
     .big-cta { font-family: var(--serif); font-size: clamp(44px, 6.5vw, 84px); font-weight: 300; font-style: italic; color: var(--cream); line-height: 1.08; margin-top: 28px; }
     .cta-accent { color: var(--gold); font-weight: 600; font-style: normal; }
 
+    /* Flywheel (business model) */
+    .fly-wrap { position: relative; width: 100%; max-width: 860px; aspect-ratio: 880 / 460; margin: 12px auto 0; }
+    .fly-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .fly-ring { transform-box: fill-box; transform-origin: center; animation: flySpin 60s linear infinite; }
+    @keyframes flySpin { to { transform: rotate(360deg); } }
+    .fly-node {
+      position: absolute; transform: translate(-50%, -50%);
+      width: 200px; background: var(--cream-10);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 13px 15px; backdrop-filter: blur(3px);
+    }
+    .fly-node .t { font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--cream); display: flex; align-items: center; margin-bottom: 5px; }
+    .fly-node .d { font-family: var(--sans); font-size: 11.5px; font-weight: 300; color: var(--cream-40); line-height: 1.5; }
+    .fly-node .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-family: var(--sans); font-size: 11px; font-weight: 600; margin-right: 8px; flex-shrink: 0; }
+    .fly-node.teal     { border-color: rgba(124,185,168,0.38); } .fly-node.teal .n     { background: var(--teal-dim);     color: var(--teal); }
+    .fly-node.coral    { border-color: var(--coral-border); }    .fly-node.coral .n    { background: var(--coral-dim);    color: var(--coral); }
+    .fly-node.lavender { border-color: rgba(155,137,196,0.40); } .fly-node.lavender .n { background: var(--lavender-dim); color: var(--lavender); }
+    .fly-node.gold     { border-color: var(--gold-border); }     .fly-node.gold .n     { background: var(--gold-dim);     color: var(--gold); }
+    .fly-hub {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 234px; text-align: center;
+      background: linear-gradient(140deg, var(--gold-dim), rgba(232,184,109,.04));
+      border: 1px solid var(--gold-border); border-radius: 18px; padding: 18px 20px;
+    }
+    .fly-hub-name { font-family: var(--serif); font-style: italic; font-size: 30px; color: var(--gold); line-height: 1; margin-bottom: 8px; }
+    .fly-hub-split { font-family: var(--sans); font-size: 11.5px; font-weight: 300; color: var(--cream-60); line-height: 1.55; }
+    .fly-hub-split strong { color: var(--gold); }
+    .fly-caption { text-align: center; font-family: var(--sans); font-size: 13px; font-style: italic; color: var(--cream-40); margin: 16px auto 0; max-width: 720px; }
+    .slide.anim .fly-wrap    { animation: fadeUp 0.75s cubic-bezier(.16,1,.3,1) both 0.40s; }
+    .slide.anim .fly-caption { animation: fadeUp 0.70s cubic-bezier(.16,1,.3,1) both 0.62s; }
+
     /* Navigation */
     .nav { position: fixed; bottom: 0; left: 0; right: 0; height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; z-index: 100; }
     .nav-btn {
@@ -491,8 +522,62 @@
     </div>
   </section>
 
-  <!-- SLIDE 8 · THE PITCH (15%) -->
+  <!-- SLIDE 8 · BUSINESS MODEL / FLYWHEEL -->
   <section class="slide" id="slide-8">
+    <div class="orb orb--gold" style="top:-160px; left:-60px;"></div>
+    <div class="orb orb--lavender" style="bottom:-170px; right:-40px;"></div>
+
+    <div class="slide-header">
+      <span class="logo">aegis</span>
+    </div>
+
+    <div class="slide-content">
+      <div class="answer">How does it pay for itself — and stay free for nonprofits?</div>
+      <h2 style="margin-bottom:8px;">A model that <strong>funds itself</strong></h2>
+
+      <div class="fly-wrap">
+        <svg class="fly-svg" viewBox="0 0 880 460" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <defs>
+            <marker id="fly-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--gold)"></path>
+            </marker>
+          </defs>
+          <ellipse class="fly-ring" cx="440" cy="230" rx="320" ry="175" fill="none" stroke="var(--gold)" stroke-opacity="0.13" stroke-dasharray="2 9"></ellipse>
+          <path d="M517.4 60.2 A320 175 0 0 1 750.5 187.7" fill="none" stroke="var(--gold)" stroke-opacity="0.5" stroke-width="1.6" marker-end="url(#fly-arrow)"></path>
+          <path d="M750.5 272.3 A320 175 0 0 1 517.4 399.8" fill="none" stroke="var(--gold)" stroke-opacity="0.5" stroke-width="1.6" marker-end="url(#fly-arrow)"></path>
+          <path d="M362.6 399.8 A320 175 0 0 1 129.5 272.3" fill="none" stroke="var(--gold)" stroke-opacity="0.5" stroke-width="1.6" marker-end="url(#fly-arrow)"></path>
+          <path d="M129.5 187.7 A320 175 0 0 1 362.6 60.2" fill="none" stroke="var(--gold)" stroke-opacity="0.5" stroke-width="1.6" marker-end="url(#fly-arrow)"></path>
+        </svg>
+
+        <div class="fly-hub">
+          <div class="fly-hub-name">aegis</div>
+          <div class="fly-hub-split">Every dollar splits — keep the platform running <strong>+</strong> fund free nonprofit protection</div>
+        </div>
+
+        <div class="fly-node teal" style="left:50%; top:11.5%;">
+          <div class="t"><span class="n">1</span> Funding in</div>
+          <div class="d">Small businesses pay for their own security · corporates sponsor as social good</div>
+        </div>
+        <div class="fly-node coral" style="left:86.4%; top:50%;">
+          <div class="t"><span class="n">2</span> Free protection</div>
+          <div class="d">Nonprofits scan &amp; fix their vulnerabilities at zero cost</div>
+        </div>
+        <div class="fly-node lavender" style="left:50%; top:88.5%;">
+          <div class="t"><span class="n">3</span> Verified badges</div>
+          <div class="d">Protected orgs prove their grade — without exposing findings</div>
+        </div>
+        <div class="fly-node gold" style="left:13.6%; top:50%;">
+          <div class="t"><span class="n">4</span> Trust &amp; reach</div>
+          <div class="d">Badges advertise Aegis &amp; sponsors, drawing the next paying customer</div>
+        </div>
+      </div>
+
+      <p class="fly-caption">A flywheel that funds itself — every protected nonprofit markets Aegis to the next paying customer.</p>
+    </div>
+  </section>
+
+  <!-- SLIDE 9 · THE PITCH (15%) -->
+  <section class="slide" id="slide-9">
     <div class="orb orb--teal" style="top:-80px; right:200px;"></div>
     <div class="orb orb--gold" style="bottom:-140px; left:100px;"></div>
 
@@ -529,13 +614,13 @@
   <button class="nav-btn" id="btn-prev" title="Previous (left arrow)">&#8592;</button>
   <div class="progress-wrap">
     <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-    <span class="counter" id="counter">1 / 8</span>
+    <span class="counter" id="counter">1 / 9</span>
   </div>
   <button class="nav-btn" id="btn-next" title="Next (right arrow)">&#8594;</button>
 </nav>
 
 <script>
-  const TOTAL = 8;
+  const TOTAL = 9;
   let cur = 1;
 
   function goTo(n) {
