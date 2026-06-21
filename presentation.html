@@ -381,22 +381,79 @@
           </div>
         </div>
 
-        <!-- Demo placeholder -->
-        <div style="border:2px dashed rgba(79,142,247,0.35); border-radius:12px; background:rgba(79,142,247,0.04); display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:280px; gap:10px;">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="1" y="1" width="38" height="38" rx="8" stroke="rgba(79,142,247,0.5)" stroke-width="1.5"/>
-            <circle cx="20" cy="20" r="10" stroke="rgba(79,142,247,0.5)" stroke-width="1.5"/>
-            <path d="M17 16l8 4-8 4V16z" fill="rgba(79,142,247,0.6)"/>
-          </svg>
-          <div style="font-family:var(--body); font-size:12px; font-weight:500; color:rgba(79,142,247,0.6); letter-spacing:0.1em; text-transform:uppercase;">Live Demo</div>
-        </div>
+        <!-- Demo video -->
+        <a href="https://youtu.be/gonoUDE9Kag" target="_blank" style="display:block; border-radius:12px; overflow:hidden; border:1px solid var(--blue-border); min-height:280px; position:relative; text-decoration:none;">
+          <img src="https://img.youtube.com/vi/gonoUDE9Kag/maxresdefault.jpg" alt="Aegis Demo" style="width:100%; height:280px; object-fit:cover; display:block;"/>
+          <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(8,12,22,0.45);">
+            <div style="width:64px; height:64px; border-radius:50%; background:rgba(79,142,247,0.85); display:flex; align-items:center; justify-content:center; margin-bottom:10px;">
+              <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M10 8l12 5-12 5V8z" fill="#fff"/></svg>
+            </div>
+            <div style="font-family:var(--body); font-size:12px; font-weight:600; color:#fff; letter-spacing:0.12em; text-transform:uppercase;">Watch Demo</div>
+          </div>
+        </a>
 
       </div>
     </div>
   </section>
 
-  <!-- SLIDE 4 · THE PITCH -->
+  <!-- SLIDE 4 · FINANCIAL MODEL -->
   <section class="slide" id="slide-4">
+    <div class="slide-header">
+      <span class="logo">aegis</span>
+      <span class="slide-label">Business Model</span>
+    </div>
+
+    <div class="slide-content centered">
+      <div class="eyebrow">How Aegis sustains itself</div>
+      <h2><strong>Financial Model</strong></h2>
+      <div class="accent-bar centered"></div>
+
+      <div style="margin-top:20px; width:100%; display:flex; justify-content:center;">
+        <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:660px; height:auto;">
+          <defs>
+            <marker id="arr-b" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0,9 3.5,0 7" fill="#4F8EF7"/>
+            </marker>
+            <marker id="arr-t" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0,9 3.5,0 7" fill="#2DD4BF"/>
+            </marker>
+          </defs>
+
+          <!-- Our Website oval -->
+          <ellipse cx="360" cy="88" rx="126" ry="48" fill="rgba(79,142,247,0.13)" stroke="#4F8EF7" stroke-width="2"/>
+          <text x="360" y="95" text-anchor="middle" font-family="Space Grotesk,sans-serif" font-size="20" font-weight="700" fill="#ffffff">Our Website</text>
+
+          <!-- Arrow: oval → expenses -->
+          <line x1="480" y1="62" x2="558" y2="36" stroke="#4F8EF7" stroke-width="1.8" marker-end="url(#arr-b)"/>
+          <text x="564" y="34" font-family="Inter,sans-serif" font-size="14" fill="rgba(255,255,255,0.60)">→ expenses</text>
+
+          <!-- Arrow: oval → $$ nonprofit -->
+          <line x1="482" y1="110" x2="558" y2="134" stroke="#2DD4BF" stroke-width="1.8" marker-end="url(#arr-t)"/>
+          <text x="564" y="138" font-family="Inter,sans-serif" font-size="14" font-weight="600" fill="#2DD4BF">$$ → nonprofit</text>
+
+          <!-- Arrow: oval → Corporations -->
+          <line x1="360" y1="136" x2="360" y2="206" stroke="#4F8EF7" stroke-width="1.8" marker-end="url(#arr-b)"/>
+
+          <!-- Corporations box -->
+          <rect x="244" y="212" width="232" height="54" rx="8" fill="rgba(79,142,247,0.11)" stroke="#4F8EF7" stroke-width="1.5"/>
+          <text x="360" y="244" text-anchor="middle" font-family="Space Grotesk,sans-serif" font-size="18" font-weight="700" fill="#ffffff">Corporations</text>
+
+          <!-- Corp examples -->
+          <text x="360" y="278" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="rgba(255,255,255,0.42)">ie: Mastercard · Citi · Capital One</text>
+
+          <!-- Curved arrow: Corporations → Small Businesses -->
+          <path d="M244,239 C200,239 162,245 132,258" stroke="#2DD4BF" stroke-width="1.8" fill="none" marker-end="url(#arr-t)"/>
+
+          <!-- Small Businesses label -->
+          <text x="74" y="244" text-anchor="middle" font-family="Space Grotesk,sans-serif" font-size="15" font-weight="600" fill="rgba(255,255,255,0.85)">Small</text>
+          <text x="74" y="264" text-anchor="middle" font-family="Space Grotesk,sans-serif" font-size="15" font-weight="600" fill="rgba(255,255,255,0.85)">Businesses</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 5 · THE PITCH -->
+  <section class="slide" id="slide-5">
     <div class="slide-header">
       <span class="logo">aegis</span>
       <span class="slide-label">NJx Hackathon · June 2026</span>
@@ -431,13 +488,13 @@
   <button class="nav-btn" id="btn-prev" title="Previous (left arrow)">&#8592;</button>
   <div class="progress-wrap">
     <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-    <span class="counter" id="counter">1 / 4</span>
+    <span class="counter" id="counter">1 / 5</span>
   </div>
   <button class="nav-btn" id="btn-next" title="Next (right arrow)">&#8594;</button>
 </nav>
 
 <script>
-  const TOTAL = 4;
+  const TOTAL = 5;
   let cur = 1;
 
   function goTo(n) {
