@@ -4,6 +4,8 @@
 // and phone numbers. Runs server-side (no browser CORS limits) and never logs
 // in or touches anything non-public.
 
+import { assertPublicHost } from "./safefetch.mjs";
+
 const FETCH_TIMEOUT_MS = 9000;
 // Safety rails so a giant site (e.g. a blog with thousands of posts) can't run
 // forever: stop after MAX_PAGES pages OR once the overall time budget is spent.
@@ -263,6 +265,8 @@ export async function crawlDomain(domain) {
   if (!host || !/^[a-z0-9.\-]+\.[a-z]{2,}$/i.test(host)) {
     throw new Error("invalid_domain");
   }
+  // SSRF guard: refuse hosts that resolve to internal/loopback/metadata IPs.
+  await assertPublicHost(host);
 
   const emails = new Set();
   const names = new Set();

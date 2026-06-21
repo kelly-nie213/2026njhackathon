@@ -7,6 +7,7 @@
 // only reads what's already public.
 
 import { normalizeDomain } from "./crawl.mjs";
+import { assertPublicHost } from "./safefetch.mjs";
 
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_SCRIPTS = 12; // how many JS files we download & scan
@@ -336,6 +337,8 @@ export async function auditDomainJs(domain) {
   if (!host || !/^[a-z0-9.\-]+\.[a-z]{2,}$/i.test(host)) {
     throw new Error("invalid_domain");
   }
+  // SSRF guard: refuse hosts that resolve to internal/loopback/metadata IPs.
+  await assertPublicHost(host);
   const startedAt = Date.now();
 
   // Reach the homepage (prefer https, fall back to www / http).

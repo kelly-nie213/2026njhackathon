@@ -10,6 +10,7 @@
 
 import tls from "node:tls";
 import { normalizeDomain } from "./crawl.mjs";
+import { assertPublicHost } from "./safefetch.mjs";
 
 const TIMEOUT_MS = 8000;
 const UA =
@@ -81,6 +82,8 @@ export async function checkWebSecurity(domain) {
   if (!host || !/^[a-z0-9.\-]+\.[a-z]{2,}$/i.test(host)) {
     throw new Error("invalid_domain");
   }
+  // SSRF guard: refuse hosts that resolve to internal/loopback/metadata IPs.
+  await assertPublicHost(host);
 
   // Fetch the homepage over https (fall back to www) and read its headers.
   let res = null;

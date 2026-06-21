@@ -158,7 +158,7 @@ app.post("/api/crawl", async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err?.message || "crawl_error";
-    const code = msg === "invalid_domain" ? 400 : msg === "unreachable" ? 502 : 500;
+    const code = msg === "invalid_domain" || msg === "blocked_host" ? 400 : msg === "unreachable" ? 502 : 500;
     console.error("crawl error:", msg);
     res.status(code).json({ error: msg });
   }
@@ -208,7 +208,7 @@ app.post("/api/web-security", async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err?.message || "web_security_error";
-    const code = msg === "invalid_domain" ? 400 : 500;
+    const code = msg === "invalid_domain" || msg === "blocked_host" ? 400 : 500;
     console.error("web-security error:", msg);
     res.status(code).json({ error: msg });
   }
@@ -311,7 +311,7 @@ app.post("/api/js-audit", async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err?.message || "audit_error";
-    const code = msg === "invalid_domain" ? 400 : msg === "unreachable" ? 502 : 500;
+    const code = msg === "invalid_domain" || msg === "blocked_host" ? 400 : msg === "unreachable" ? 502 : 500;
     console.error("js-audit error:", msg);
     res.status(code).json({ error: msg });
   }
