@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { crawlDomain } from "./crawl.mjs";
 import { checkEmails } from "./breachlookup.mjs";
 import { auditDomainJs } from "./jsaudit.mjs";
+import { checkDomainSecurity } from "./domaincheck.mjs";
 
 const PORT = process.env.PORT || 8787;
 const MODEL = "claude-opus-4-8";
@@ -146,14 +147,37 @@ app.post("/api/breaches", async (req, res) => {
   }
 });
 
+// BreachDetector: live DNS check of email-spoofing protection (SPF/DMARC/DKIM/MX).
+app.post("/api/domain-check", async (req, res) => {
+  const { domain } = req.body ?? {};
+  if (!domain || typeof domain !== "string") {
+    return res.status(400).json({ error: "domain_required" });
+  }
+  try {
+    const result = await checkDomainSecurity(domain);
+    res.json(result);
+  } catch (err) {
+    const msg = err?.message || "domain_check_error";
+    const code = msg === "invalid_domain" ? 400 : 500;
+    console.error("domain-check error:", msg);
+    res.status(code).json({ error: msg });
+  }
+});
+
 // BreachDetector: turn raw exposure findings into risks + a plain-language plan.
 app.post("/api/breach-report", async (req, res) => {
   if (!client) return res.status(503).json({ error: "no_api_key" });
-  const { orgName, domain, emails, names, phones, breaches } = req.body ?? {};
+  const { orgName, domain, emails, names, phones, breaches, domainSecurity } = req.body ?? {};
   try {
     const breachLines = (breaches || [])
       .map((b) => `- ${b.email}: ${b.breachCount} breach(es)${b.breaches?.length ? ` (${b.breaches.map((x) => x.title).join(", ")})` : ""}`)
       .join("\n");
+    const domainLines = domainSecurity
+      ? `Email-spoofing protection (live DNS check) — domain ${domainSecurity.spoofable ? "CAN be spoofed" : "is reasonably protected"}:\n` +
+        (domainSecurity.checks || [])
+          .map((c) => `- ${c.label} [${c.status}]: ${c.title}`)
+          .join("\n")
+      : "Email-spoofing protection: not checked";
     const result = await client.messages.create({
       model: MODEL,
       max_tokens: 16000,
@@ -161,11 +185,13 @@ app.post("/api/breach-report", async (req, res) => {
       output_config: { effort: "medium", format: { type: "json_schema", schema: BREACH_REPORT_SCHEMA } },
       system:
         "You advise small nonprofits with no IT staff. A scan of their public website found staff emails, " +
-        "names and phone numbers, and checked those emails against known data breaches. " +
+        "names and phone numbers, checked those emails against known data breaches, and checked via live DNS " +
+        "whether the domain can be spoofed in email (SPF/DMARC/DKIM). " +
         "Explain, in plain language a volunteer can act on, the concrete RISKS this exposure creates " +
         "(who an attacker could impersonate, what a breached password lets them do, how harvested names/phones enable " +
-        "phishing and vishing), the real-world CONSEQUENCES, and WHO is at risk. Then give a prioritized, jargon-free " +
-        "action plan — highest-impact, easiest wins first. Be specific to what was actually found; never invent findings.",
+        "phishing and vishing, and what an unprotected domain lets attackers send), the real-world CONSEQUENCES, and WHO is at risk. " +
+        "Then give a prioritized, jargon-free action plan — highest-impact, easiest wins first. " +
+        "Be specific to what was actually found; never invent findings.",
       messages: [
         {
           role: "user",
@@ -175,6 +201,7 @@ app.post("/api/breach-report", async (req, res) => {
             `Public names found: ${(names || []).join(", ") || "none"}\n` +
             `Public phone numbers found: ${(phones || []).join(", ") || "none"}\n\n` +
             `Breach exposure per email:\n${breachLines || "none checked"}\n\n` +
+            `${domainLines}\n\n` +
             `Write a 2-3 sentence summary, 3-5 risks, and 4-6 ordered action steps.`,
         },
       ],

@@ -54,7 +54,39 @@ export interface BreachReport {
   actions: ActionItem[];
 }
 
+export interface DomainCheckItem {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  severity: Severity;
+  title: string;
+  detail: string;
+  evidence: string;
+}
+
+export interface DomainSecurity {
+  domain: string;
+  checks: DomainCheckItem[];
+  worst: Severity;
+  spoofable: boolean;
+}
+
 /* --------------------------- API calls --------------------------- */
+
+/** Live DNS spoofing-protection check. Returns null on failure (optional in the UI). */
+export async function checkDomainSecurity(domain: string): Promise<DomainSecurity | null> {
+  try {
+    const res = await fetch("/api/domain-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain }),
+    });
+    if (res.ok) return res.json();
+  } catch {
+    /* optional — don't sink the scan */
+  }
+  return null;
+}
 
 export async function crawlDomain(domain: string): Promise<CrawlResult> {
   const res = await fetch("/api/crawl", {
@@ -83,7 +115,8 @@ export async function lookupBreaches(emails: string[]): Promise<BreachLookup> {
 export async function generateReport(
   crawl: CrawlResult,
   lookup: BreachLookup,
-  orgName: string
+  orgName: string,
+  domainSec?: DomainSecurity | null
 ): Promise<{ report: BreachReport; source: "ai" | "fallback" }> {
   try {
     const res = await fetch("/api/breach-report", {
@@ -100,13 +133,23 @@ export async function generateReport(
           breachCount: r.breachCount,
           breaches: r.breaches,
         })),
+        domainSecurity: domainSec
+          ? {
+              spoofable: domainSec.spoofable,
+              checks: domainSec.checks.map((c) => ({
+                label: c.label,
+                status: c.status,
+                title: c.title,
+              })),
+            }
+          : null,
       }),
     });
     if (res.ok) return { report: await res.json(), source: "ai" };
   } catch {
     /* fall through */
   }
-  return { report: buildReport(crawl, lookup), source: "fallback" };
+  return { report: buildReport(crawl, lookup, domainSec), source: "fallback" };
 }
 
 /* ----------------------- deterministic engine ----------------------- */
@@ -128,7 +171,11 @@ export function overallSeverity(lookup: BreachLookup): Severity {
   return "low";
 }
 
-function buildReport(crawl: CrawlResult, lookup: BreachLookup): BreachReport {
+function buildReport(
+  crawl: CrawlResult,
+  lookup: BreachLookup,
+  domainSec?: DomainSecurity | null
+): BreachReport {
   const breached = lookup.results.filter((r) => r.status === "breached");
   const worst = [...breached].sort((a, b) => b.breachCount - a.breachCount)[0];
   const hasPasswords = breached.some((r) =>
@@ -136,6 +183,17 @@ function buildReport(crawl: CrawlResult, lookup: BreachLookup): BreachReport {
   );
 
   const risks: RiskItem[] = [];
+
+  if (domainSec?.spoofable) {
+    risks.push({
+      title: "Your domain can be spoofed in email",
+      severity: "high",
+      consequence:
+        "Without enforced SPF/DMARC, an attacker can send email that appears to come from your real address — " +
+        "fake donation appeals to supporters or 'pay this invoice' notes to staff that pass basic checks.",
+      whoAtRisk: ["Donors & supporters", "Staff & volunteers", "Vendors"],
+    });
+  }
 
   if (breached.length > 0) {
     risks.push({
@@ -239,6 +297,19 @@ function buildReport(crawl: CrawlResult, lookup: BreachLookup): BreachReport {
       ],
     },
   ];
+
+  if (domainSec?.spoofable) {
+    actions.unshift({
+      title: "Lock down your domain so attackers can't spoof your email",
+      why: "Enforced SPF + DMARC stop criminals from sending scam emails that look like they came from your real address — protecting donors, staff and vendors at once.",
+      effort: "1 hour",
+      steps: [
+        "Ask your email provider (or a volunteer) to add a DMARC record and set the policy to 'reject'.",
+        "Make sure SPF lists your real senders and ends in -all, and turn on DKIM signing.",
+        "Add a line to your newsletter/site: 'We will never email you new bank details.'",
+      ],
+    });
+  }
 
   const summary =
     breached.length > 0
