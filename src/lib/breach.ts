@@ -247,3 +247,13 @@ function buildReport(crawl: CrawlResult, lookup: BreachLookup): BreachReport {
 
   return { summary, risks, actions };
 }
+
+export const SEVERITY_META: Record<
+  Severity,
+  { label: string; color: string; bg: string }
+> = {
+  low: { label: "Low", color: "var(--color-risk-low)", bg: "rgba(52,211,153,0.12)" },
+  medium: { label: "Medium", color: "var(--color-risk-med)", bg: "rgba(251,191,36,0.12)" },
+  high: { label: "High", color: "var(--color-risk-high)", bg: "rgba(251,113,133,0.12)" },
+  critical: { label: "Critical", color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)" },
+};
