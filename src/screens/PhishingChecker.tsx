@@ -13,11 +13,11 @@ us until I announce it. Thanks - David`;
 
 const VERDICT_META: Record<
   PhishingVerdict["verdict"],
-  { label: string; color: string; bg: string; icon: string }
+  { label: string; color: string; bg: string }
 > = {
-  likely_phishing: { label: "Likely phishing", color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)",  icon: "🚨" },
-  suspicious:      { label: "Suspicious",      color: "var(--color-risk-med)",  bg: "rgba(251,191,36,0.14)", icon: "⚠️" },
-  likely_safe:     { label: "Likely safe",     color: "var(--color-risk-low)",  bg: "rgba(52,211,153,0.14)", icon: "✓"  },
+  likely_phishing: { label: "Likely phishing", color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)" },
+  suspicious:      { label: "Suspicious",      color: "var(--color-risk-med)",  bg: "rgba(251,191,36,0.14)" },
+  likely_safe:     { label: "Likely safe",     color: "var(--color-risk-low)",  bg: "rgba(52,211,153,0.14)" },
 };
 
 /* ── Decorative mail-shield SVG ── */
@@ -98,7 +98,8 @@ export default function PhishingChecker() {
             <button
               onClick={run}
               disabled={loading || !text.trim()}
-              className="mt-3 w-full rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 py-3 font-semibold text-white shadow-lg shadow-brand-600/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              className="p-btn p-prim-col p-btn-block"
+              style={{ width: "100%", margin: "0.75rem 0 0" }}
             >
               {loading ? "Analyzing…" : "Analyze message"}
             </button>
@@ -156,7 +157,10 @@ export default function PhishingChecker() {
                     style={{ background: VERDICT_META[result.verdict].bg }}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">{VERDICT_META[result.verdict].icon}</span>
+                      <span
+                        className="inline-block h-3 w-3 flex-none rounded-full"
+                        style={{ background: VERDICT_META[result.verdict].color }}
+                      />
                       <span className="text-lg font-bold" style={{ color: VERDICT_META[result.verdict].color }}>
                         {VERDICT_META[result.verdict].label}
                       </span>

@@ -18,7 +18,6 @@ type Severity = "critical" | "high" | "medium";
 
 interface Pillar {
   id: number;
-  icon: string;
   title: string;
   severity: Severity;
   stat: string;
@@ -34,7 +33,6 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     id: 1,
-    icon: "🔑",
     title: "Weak Password Hygiene",
     severity: "critical",
     stat: "81%",
@@ -52,7 +50,6 @@ const PILLARS: Pillar[] = [
   },
   {
     id: 2,
-    icon: "🔐",
     title: "No Multi-Factor Authentication",
     severity: "critical",
     stat: "99.9%",
@@ -70,7 +67,6 @@ const PILLARS: Pillar[] = [
   },
   {
     id: 3,
-    icon: "💻",
     title: "Outdated Computers & Unpatched Software",
     severity: "high",
     stat: "60%",
@@ -88,7 +84,6 @@ const PILLARS: Pillar[] = [
   },
   {
     id: 4,
-    icon: "💾",
     title: "Lack of Robust Backups",
     severity: "critical",
     stat: "3-2-1",
@@ -106,7 +101,6 @@ const PILLARS: Pillar[] = [
   },
   {
     id: 5,
-    icon: "🛡️",
     title: "No Modern Security Protections",
     severity: "high",
     stat: "94%",
@@ -124,7 +118,6 @@ const PILLARS: Pillar[] = [
   },
   {
     id: 6,
-    icon: "📋",
     title: "Poor IT Procedures & Governance",
     severity: "high",
     stat: "277 days",
@@ -142,7 +135,6 @@ const PILLARS: Pillar[] = [
   },
   {
     id: 7,
-    icon: "🎣",
     title: "No Security Awareness Training",
     severity: "critical",
     stat: "88%",
@@ -161,25 +153,25 @@ const PILLARS: Pillar[] = [
 ];
 
 const PERSONAL_TIPS = [
-  { icon: "🔑", tip: "Use a password manager", detail: "Bitwarden (free) or 1Password — never reuse a password" },
-  { icon: "📱", tip: "Enable MFA on everything", detail: "Start with email, then banking, then everything else" },
-  { icon: "🔄", tip: "Update immediately", detail: "When your phone or computer says 'update available', do it today, not next week" },
-  { icon: "🎣", tip: "Pause before you click", detail: "Urgency + unusual request = almost certainly a scam. Call to verify." },
-  { icon: "📶", tip: "Use a VPN on public Wi-Fi", detail: "Coffee shops, airports, hotels — always use a VPN (Mullvad, ProtonVPN)" },
-  { icon: "💾", tip: "Back up your personal data", detail: "Photos, documents — use an external drive AND cloud backup" },
-  { icon: "🔒", tip: "Lock your screens", detail: "Auto-lock after 2 minutes on all devices, every time, everywhere" },
-  { icon: "👁️", tip: "Check your accounts", detail: "Review bank and credit card statements weekly — catch fraud fast" },
+  { tip: "Use a password manager", detail: "Bitwarden (free) or 1Password — never reuse a password" },
+  { tip: "Enable MFA on everything", detail: "Start with email, then banking, then everything else" },
+  { tip: "Update immediately", detail: "When your phone or computer says 'update available', do it today, not next week" },
+  { tip: "Pause before you click", detail: "Urgency + unusual request = almost certainly a scam. Call to verify." },
+  { tip: "Use a VPN on public Wi-Fi", detail: "Coffee shops, airports, hotels — always use a VPN (Mullvad, ProtonVPN)" },
+  { tip: "Back up your personal data", detail: "Photos, documents — use an external drive AND cloud backup" },
+  { tip: "Lock your screens", detail: "Auto-lock after 2 minutes on all devices, every time, everywhere" },
+  { tip: "Check your accounts", detail: "Review bank and credit card statements weekly — catch fraud fast" },
 ];
 
 const ORG_TIPS = [
-  { icon: "📝", tip: "Write an offboarding checklist", detail: "Revoke all access the day someone leaves — email, CRM, Slack, everything" },
-  { icon: "🗺️", tip: "Map your data", detail: "Know where donor PII lives: which databases, cloud drives, spreadsheets" },
-  { icon: "📧", tip: "Upgrade to Microsoft 365 or Google Workspace", detail: "Built-in email filtering, MFA, device management — worth every dollar" },
-  { icon: "🚨", tip: "Write a one-page incident response plan", detail: "Who to call, what to do first, who has authority to act — before you need it" },
-  { icon: "💰", tip: "Cyber insurance", detail: "Many nonprofits qualify for affordable policies that cover breach response costs" },
-  { icon: "📚", tip: "Quarterly security check-in", detail: "30-minute team meeting: review recent phishing examples and remind of procedures" },
-  { icon: "🔑", tip: "Enforce MFA org-wide", detail: "Require it in your Google/Microsoft admin console — not optional" },
-  { icon: "📦", tip: "Test your backups", detail: "Quarterly fire drill: restore a file from backup to prove it actually works" },
+  { tip: "Write an offboarding checklist", detail: "Revoke all access the day someone leaves — email, CRM, Slack, everything" },
+  { tip: "Map your data", detail: "Know where donor PII lives: which databases, cloud drives, spreadsheets" },
+  { tip: "Upgrade to Microsoft 365 or Google Workspace", detail: "Built-in email filtering, MFA, device management — worth every dollar" },
+  { tip: "Write a one-page incident response plan", detail: "Who to call, what to do first, who has authority to act — before you need it" },
+  { tip: "Cyber insurance", detail: "Many nonprofits qualify for affordable policies that cover breach response costs" },
+  { tip: "Quarterly security check-in", detail: "30-minute team meeting: review recent phishing examples and remind of procedures" },
+  { tip: "Enforce MFA org-wide", detail: "Require it in your Google/Microsoft admin console — not optional" },
+  { tip: "Test your backups", detail: "Quarterly fire drill: restore a file from backup to prove it actually works" },
 ];
 
 /* ════════════════════════════════════════
@@ -187,9 +179,9 @@ const ORG_TIPS = [
 ════════════════════════════════════════ */
 
 const SEV: Record<Severity, { label: string; color: string; bg: string; border: string }> = {
-  critical: { label: "CRITICAL", color: "#f43f5e", bg: "rgba(244,63,94,0.12)",  border: "rgba(244,63,94,0.30)" },
-  high:     { label: "HIGH",     color: "#fb7185", bg: "rgba(251,113,133,0.10)", border: "rgba(251,113,133,0.28)" },
-  medium:   { label: "MEDIUM",   color: "#fbbf24", bg: "rgba(251,191,36,0.10)",  border: "rgba(251,191,36,0.28)" },
+  critical: { label: "CRITICAL", color: "#ff453a", bg: "rgba(255,69,58,0.12)",  border: "rgba(255,69,58,0.30)" },
+  high:     { label: "HIGH",     color: "#ff9f0a", bg: "rgba(255,159,10,0.10)", border: "rgba(255,159,10,0.28)" },
+  medium:   { label: "MEDIUM",   color: "#ffd60a", bg: "rgba(255,214,10,0.10)",  border: "rgba(255,214,10,0.28)" },
 };
 
 /* ════════════════════════════════════════
@@ -214,16 +206,13 @@ function PillarCard({ p }: { p: Pillar }) {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-start gap-4 p-6 text-left transition hover:bg-white/[0.02]"
       >
-        {/* Number + icon */}
-        <div className="flex-none text-center">
+        {/* Pillar number */}
+        <div className="flex-none">
           <div
-            className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl"
-            style={{ background: s.bg, border: `1px solid ${s.border}` }}
+            className="flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold tabular-nums"
+            style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}
           >
-            {p.icon}
-          </div>
-          <div className="mt-1 text-[10px] font-bold tabular-nums text-muted">
-            #{String(p.id).padStart(2, "0")}
+            {String(p.id).padStart(2, "0")}
           </div>
         </div>
 
@@ -304,7 +293,6 @@ function PillarCard({ p }: { p: Pillar }) {
                           key={id}
                           className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs"
                         >
-                          <span>{other.icon}</span>
                           <span className="text-brand-300">#{String(id).padStart(2, "0")}</span>
                           <span className="text-muted">{other.title}</span>
                         </span>
@@ -337,7 +325,7 @@ function PillarCard({ p }: { p: Pillar }) {
               {/* Quick win highlight */}
               <div className="card-glow-lime rounded-xl border border-accent-500/25 bg-accent-500/8 px-4 py-3">
                 <div className="mb-1 text-[11px] font-bold uppercase tracking-widest text-accent-400">
-                  ⚡ Quick win — do this today
+                  Quick win — do this today
                 </div>
                 <p className="text-sm leading-relaxed text-fg">{p.quickWin}</p>
               </div>
@@ -378,10 +366,10 @@ function PillarCard({ p }: { p: Pillar }) {
 ════════════════════════════════════════ */
 
 const TABS = [
-  { id: "overview",  label: "Overview",        icon: "📊" },
-  { id: "pillars",   label: "7 Pillars",        icon: "🏛️" },
-  { id: "personal",  label: "Protect Yourself", icon: "👤" },
-  { id: "org",       label: "For Organizations",icon: "🏢" },
+  { id: "overview",  label: "Overview" },
+  { id: "pillars",   label: "7 Pillars" },
+  { id: "personal",  label: "Protect Yourself" },
+  { id: "org",       label: "For Organizations" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -441,11 +429,10 @@ export default function LearnMore() {
                   className="relative flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200"
                   style={
                     active
-                      ? { background: "linear-gradient(135deg, #4f46e5, #65a30d)", color: "#fff", boxShadow: "0 2px 12px rgba(99,102,241,0.35)" }
+                      ? { background: "linear-gradient(135deg, #0a84ff, #32ade6)", color: "#fff", boxShadow: "0 2px 12px rgba(99,102,241,0.35)" }
                       : { color: "var(--color-muted)" }
                   }
                 >
-                  <span className="text-base leading-none">{t.icon}</span>
                   <span className="hidden sm:inline">{t.label}</span>
                   <span className="sm:hidden text-xs">{t.label.split(" ")[0]}</span>
                 </button>
@@ -488,7 +475,6 @@ export default function LearnMore() {
                       onClick={() => setActiveTab(t.id)}
                       className="flex items-start gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-4 text-left transition hover:border-brand-500/30 hover:bg-brand-500/[0.05]"
                     >
-                      <span className="text-2xl">{t.icon}</span>
                       <div>
                         <div className="text-sm font-semibold text-fg">{t.label}</div>
                         <div className="mt-0.5 text-xs text-muted">
@@ -515,27 +501,27 @@ export default function LearnMore() {
 
               {/* CTA */}
               <div className="card card-glow rounded-2xl p-6 text-center">
-                <div className="mb-1 text-2xl">🛡️</div>
                 <h2 className="mb-2 text-lg font-bold">Ready to check your actual exposure?</h2>
                 <p className="mb-5 text-sm text-muted">Use Aegis's tools to see which risks apply to you right now.</p>
                 <div className="flex flex-wrap justify-center gap-3">
                   <button
                     onClick={() => nav("/")}
-                    className="rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/30 transition hover:brightness-110"
+                    className="p-btn p-prim-col"
+                    style={{ margin: 0 }}
                   >
-                    🔍 Scan for breach exposure
+                    Scan for breach exposure
                   </button>
                   <button
                     onClick={() => nav("/phishing")}
                     className="rounded-xl border border-white/12 px-5 py-2.5 text-sm font-medium text-muted transition hover:border-white/25 hover:text-fg"
                   >
-                    ✉️ Check a suspicious message
+                    Check a suspicious message
                   </button>
                   <button
                     onClick={() => nav("/triage")}
                     className="rounded-xl border border-risk-high/30 bg-risk-crit/8 px-5 py-2.5 text-sm font-medium text-risk-high transition hover:bg-risk-crit/15"
                   >
-                    ⚡ Something already happened
+                    Something already happened
                   </button>
                 </div>
                 <div className="mt-6 border-t border-white/[0.06] pt-5">
@@ -599,7 +585,6 @@ export default function LearnMore() {
                     transition={{ duration: 0.3, delay: i * 0.05 }}
                     className="card flex items-start gap-3.5 p-4"
                   >
-                    <span className="flex-none text-xl">{t.icon}</span>
                     <div>
                       <div className="text-sm font-semibold">{t.tip}</div>
                       <div className="mt-0.5 text-xs leading-relaxed text-muted">{t.detail}</div>
@@ -638,7 +623,6 @@ export default function LearnMore() {
                     transition={{ duration: 0.3, delay: i * 0.05 }}
                     className="card flex items-start gap-3.5 p-4"
                   >
-                    <span className="flex-none text-xl">{t.icon}</span>
                     <div>
                       <div className="text-sm font-semibold">{t.tip}</div>
                       <div className="mt-0.5 text-xs leading-relaxed text-muted">{t.detail}</div>
@@ -654,21 +638,22 @@ export default function LearnMore() {
                 <div className="flex flex-wrap justify-center gap-3">
                   <button
                     onClick={() => nav("/")}
-                    className="rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                    className="p-btn p-prim-col"
+                    style={{ margin: 0 }}
                   >
-                    🔍 Breach Detector
+                    Breach Detector
                   </button>
                   <button
                     onClick={() => nav("/triage")}
                     className="rounded-xl border border-white/12 px-4 py-2 text-sm font-medium text-muted transition hover:border-white/25 hover:text-fg"
                   >
-                    ⚡ Incident Triage
+                    Incident Triage
                   </button>
                   <button
-                    onClick={() => nav("/code-audit")}
+                    onClick={() => nav("/phishing")}
                     className="rounded-xl border border-white/12 px-4 py-2 text-sm font-medium text-muted transition hover:border-white/25 hover:text-fg"
                   >
-                    &lt;/&gt; Code Auditor
+                    Phishing Checker
                   </button>
                 </div>
               </div>

@@ -30,9 +30,30 @@ const ROLE_MAILBOXES = new Set([
   "events", "membership", "outreach", "communications", "marketing", "billing",
 ]);
 
-// Titles we trust as a signal that the preceding capitalized words are a person.
-const TITLE_RE =
-  /(Executive Director|Deputy Director|Managing Director|Program Director|Development Director|Director|President|Vice President|CEO|CFO|COO|Founder|Co-?Founder|Chair(?:person|man|woman)?|Treasurer|Secretary|Coordinator|Manager|Officer|Pastor|Principal|Superintendent|Board Member|Trustee)/;
+// Titles split by trust level.
+// STRONG titles almost never appear inside product/feature names, so on their own
+// they're a reliable "the preceding words are a person" signal.
+// WEAK titles ("Manager", "Officer", "Coordinator") show up constantly in product
+// names — "Google Tag Manager", "Ad Manager", "Password Manager" — so for those we
+// ALSO require the candidate's first word to be a recognizable given name.
+const STRONG_TITLE_SRC =
+  "Executive Director|Deputy Director|Managing Director|Program Director|Development Director|Director|Vice President|President|CEO|CFO|COO|CTO|Co-?Founder|Founder|Chair(?:person|man|woman)?|Treasurer|Secretary|Pastor|Principal|Superintendent|Board Member|Trustee";
+const WEAK_TITLE_SRC = "Coordinator|Manager|Officer";
+const TITLE_SRC = `(?:${STRONG_TITLE_SRC}|${WEAK_TITLE_SRC})`;
+const STRONG_TITLE_RE = new RegExp(`^(?:${STRONG_TITLE_SRC})$`, "i");
+
+// Common given names — used to confirm that something the regex thinks is a name
+// really starts like a person's name. Keeps recall reasonable while killing
+// product-name false positives. (Not exhaustive; strong titles are the other path.)
+const COMMON_FIRST_NAMES = new Set(
+  (
+    "james robert john michael david william richard joseph thomas charles christopher daniel matthew anthony mark donald steven andrew paul joshua kenneth kevin brian george timothy ronald edward jason jeffrey ryan jacob gary nicholas eric jonathan stephen larry justin scott brandon benjamin samuel gregory alexander patrick frank raymond jack dennis jerry tyler aaron jose henry adam douglas nathan peter zachary kyle walter harold jeremy ethan carl keith roger gerald christian terry sean arthur austin noah lawrence jesse joe bryan billy jordan albert dylan bruce gabriel alan juan logan wayne ralph roy eugene randy vincent russell louis philip bobby johnny bradley " +
+    "mary patricia jennifer linda elizabeth barbara susan jessica sarah karen lisa nancy betty margaret sandra ashley kimberly emily donna michelle dorothy carol amanda melissa deborah stephanie rebecca sharon laura cynthia kathleen amy angela shirley anna brenda pamela emma nicole helen samantha katherine christine debra rachel carolyn janet catherine maria heather diane ruth julie olivia joyce virginia victoria kelly lauren christina joan evelyn judith megan andrea cheryl hannah jacqueline martha gloria teresa ann sara madison frances kathryn janice jean abigail alice julia judy sophia grace denise amber marilyn danielle beverly isabella theresa diana natalie brittany charlotte marie kayla alexis lori " +
+    "mohammed muhammad ahmed ali omar hassan ibrahim yusuf fatima aisha layla zainab mei wei ling jing chen hiro yuki kenji sofia mateo santiago diego carlos luis miguel jorge javier ana elena ivan olga sergei dmitri raj priya amit sanjay anita deepak vijay arjun ananya kwame amara chidi ngozi jin min seo ji-woo aaliyah malik jamal imani kofi sven lars anders ingrid freya"
+  )
+    .split(/\s+/)
+    .filter(Boolean)
+);
 
 // Common capitalized words that look like names to a regex but never are.
 // If any token of a candidate name is in here, we drop it.
@@ -85,6 +106,27 @@ function sameSite(linkHost, baseHost) {
   return linkHost === baseHost || linkHost === "www." + baseHost || "www." + linkHost === baseHost;
 }
 
+// Words drawn from the site's own domain that should never be treated as a
+// person's name (e.g. "google" from google.com). We deliberately skip any token
+// that is also a common first name (so "grace" from grace-foodbank.org still
+// counts as a real name if a staffer is called Grace).
+function brandRejectTokens(host) {
+  const labels = host.toLowerCase().split(".");
+  labels.pop(); // drop the TLD (.com/.org/...)
+  // Drop a 2nd-level public suffix label like the "co" in "co.uk".
+  if (labels.length > 1 && ["co", "com", "org", "net", "gov", "edu", "ac"].includes(labels[labels.length - 1])) {
+    labels.pop();
+  }
+  const tokens = new Set();
+  for (const label of labels) {
+    if (label === "www") continue;
+    for (const part of label.split("-")) {
+      if (part.length >= 3 && !COMMON_FIRST_NAMES.has(part)) tokens.add(part);
+    }
+  }
+  return tokens;
+}
+
 /** Strip scripts/styles/tags and decode the handful of entities that matter. */
 function visibleText(html) {
   return html
@@ -114,32 +156,46 @@ function extractEmails(html) {
   return found;
 }
 
-function nameFromEmail(email) {
+function nameFromEmail(email, brand) {
   const local = email.split("@")[0];
   if (ROLE_MAILBOXES.has(local)) return null;
   // first.last / first_last / first-last
   const parts = local.split(/[._\-]/).filter((p) => /^[a-z]{2,}$/i.test(p));
   if (parts.length >= 2 && parts.length <= 3) {
-    // Drop org-ish locals like "aylus.org" → "Aylus Org".
-    if (parts.some((p) => NAME_STOPWORDS.has(p.toLowerCase()))) return null;
+    const lower = parts.map((p) => p.toLowerCase());
+    // Drop org-ish locals ("aylus.org" → "Aylus Org") and brand tokens.
+    if (lower.some((p) => NAME_STOPWORDS.has(p) || brand.has(p))) return null;
+    // A first.last mailbox is reliable only if it starts like a real given name.
+    if (!COMMON_FIRST_NAMES.has(lower[0])) return null;
     return parts.map((p) => p[0].toUpperCase() + p.slice(1)).join(" ");
   }
   return null;
 }
 
-function extractNamesFromText(text) {
+function extractNamesFromText(text, brand) {
   const names = new Set();
-  // "Jane Q. Public, Executive Director" style — high precision, title-anchored.
+  // "Jane Q. Public, Executive Director" style — title-anchored, then gated so we
+  // don't mistake product names ("Google Tag Manager") for people.
   const re = new RegExp(
-    `([A-Z][a-z]+(?:\\s+[A-Z]\\.?)?(?:\\s+[A-Z][a-z]+){1,2})\\s*(?:,|–|—|-|\\bis\\b|\\n)?\\s*(?:our\\s+)?${TITLE_RE.source}`,
+    `([A-Z][a-z]+(?:\\s+[A-Z]\\.?)?(?:\\s+[A-Z][a-z]+){1,2})\\s*(?:,|–|—|-|\\bis\\b|\\n)?\\s*(?:our\\s+)?(${TITLE_SRC})`,
     "g"
   );
   for (const m of text.matchAll(re)) {
     const name = m[1].trim().replace(/\s+/g, " ");
+    const title = m[2];
     const tokens = name.split(" ");
     if (tokens.length < 2) continue;
-    // Reject if any word is a generic/org term (drops "Chief Philanthropy", etc.).
-    if (tokens.some((t) => NAME_STOPWORDS.has(t.replace(/\.$/, "").toLowerCase()))) continue;
+    const lower = tokens.map((t) => t.replace(/\.$/, "").toLowerCase());
+    // Reject generic/org terms ("Chief Philanthropy", "Annual Report", …).
+    if (lower.some((t) => NAME_STOPWORDS.has(t))) continue;
+    // Reject the site's own brand words ("Google Tag", "Acme Foundation", …).
+    if (lower.some((t) => brand.has(t))) continue;
+    // Accept only if it reads like a person: a known given name, OR a strong
+    // leadership title that products don't borrow. Weak titles (Manager/Officer)
+    // require the given-name check, which is what kills "… Password Manager".
+    const knownFirstName = COMMON_FIRST_NAMES.has(lower[0]);
+    const strongTitle = STRONG_TITLE_RE.test(title);
+    if (!knownFirstName && !strongTitle) continue;
     names.add(name);
   }
   return names;
@@ -147,14 +203,19 @@ function extractNamesFromText(text) {
 
 function extractPhones(text) {
   const found = new Set();
-  const re = /(?:\+?1[\s.\-]?)?\(?([2-9]\d{2})\)?[\s.\-]?(\d{3})[\s.\-]?(\d{4})\b/g;
+  // North-American format. Area code and exchange must both start 2-9 (NANP rule).
+  const re = /(?:\+?1[\s.\-]?)?\(?([2-9]\d{2})\)?[\s.\-]?([2-9]\d{2})[\s.\-]?(\d{4})\b/g;
   for (const m of text.matchAll(re)) {
     // Reject matches that are part of a longer digit run (e.g. IDs, zips).
     const before = text[m.index - 1];
     const after = text[m.index + m[0].length];
     if (/\d/.test(before || "") || /\d/.test(after || "")) continue;
-    const pretty = `(${m[1]}) ${m[2]}-${m[3]}`;
-    found.add(pretty);
+    const [, area, exch, line] = m;
+    // Reject service codes (N11 like 411/911) in the area code or exchange.
+    if (/^[2-9]11$/.test(area) || /^[2-9]11$/.test(exch)) continue;
+    // Reject the reserved "fictional" range 555-0100…555-0199 used in examples.
+    if (exch === "555" && line >= "0100" && line <= "0199") continue;
+    found.add(`(${area}) ${exch}-${line}`);
   }
   return found;
 }
@@ -232,11 +293,12 @@ export async function crawlDomain(domain) {
   if (!home) throw new Error("unreachable");
 
   const baseHost = new URL(home).hostname.replace(/^www\./, "");
+  const brand = brandRejectTokens(baseHost);
 
   const ingest = (html) => {
     for (const e of extractEmails(html)) emails.add(e);
     const text = visibleText(html);
-    for (const n of extractNamesFromText(text)) names.add(n);
+    for (const n of extractNamesFromText(text, brand)) names.add(n);
     for (const p of extractPhones(text)) phones.add(p);
   };
 
@@ -298,7 +360,7 @@ export async function crawlDomain(domain) {
 
   // Derive additional names from the email local-parts we found.
   for (const e of emails) {
-    const n = nameFromEmail(e);
+    const n = nameFromEmail(e, brand);
     if (n) names.add(n);
   }
 

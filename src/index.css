@@ -1,36 +1,45 @@
 @import "tailwindcss";
 
+/* Puppertino — Apple/macOS component framework (buttons + forms we use).
+   Class-based (.p-*), no global resets; dark palette enabled via data-p-theme. */
+@import "./puppertino/color_palette.css";
+@import "./puppertino/buttons.css";
+@import "./puppertino/forms.css";
+@import "./puppertino/dark_mode.css";
+
 @theme {
-  /* ── Surfaces — deep warm obsidian ── */
-  --color-ink-950: #020308;
-  --color-ink-900: #04061c;
-  --color-ink-850: #080c2840;
-  --color-ink-800: #0b1028;
-  --color-ink-700: #121830;
-  --color-ink-600: #1c2440;
+  /* ── Surfaces ── */
+  --color-ink-950: #000000;
+  --color-ink-900: #0a0a0c;
+  --color-ink-850: #14141699;
+  --color-ink-800: #1c1c1e;
+  --color-ink-700: #2c2c2e;
+  --color-ink-600: #3a3a3c;
 
-  /* ── Primary — Electric Indigo ── */
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
+  /* ── Apple system blue (dark) ── */
+  --color-brand-300: #6cb6ff;
+  --color-brand-400: #409cff;
+  --color-brand-500: #0a84ff;
+  --color-brand-600: #0a6fd8;
 
-  /* ── Secondary — Neon Lime ── */
-  --color-accent-400: #a3e635;
-  --color-accent-500: #84cc16;
-  --color-accent-600: #65a30d;
+  /* ── Apple system green / cyan (secondary) ── */
+  --color-accent-400: #64d2ff;
+  --color-accent-500: #30d158;
+  --color-accent-600: #28b34c;
 
-  /* ── Risk semantics (unchanged — they're semantic) ── */
-  --color-risk-low:  #34d399;
-  --color-risk-med:  #fbbf24;
-  --color-risk-high: #fb7185;
-  --color-risk-crit: #f43f5e;
+  /* ── Risk semantics — Apple system colors ── */
+  --color-risk-low:  #30d158;          /* systemGreen */
+  --color-risk-med:  #ffd60a;          /* systemYellow */
+  --color-risk-high: #ff9f0a;          /* systemOrange */
+  --color-risk-crit: #ff453a;          /* systemRed */
 
-  --color-fg:    #f1f2ff;
-  --color-muted: #6875a0;
+  --color-fg:    #ffffff;
+  --color-muted: rgba(235, 235, 245, 0.55);   /* Apple secondary label */
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "SF Mono", "Fira Code", ui-monospace, monospace;
+  /* Inter renders everywhere and reads as San Francisco; real SF on Apple devices. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Inter", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace;
 }
 
 :root { color-scheme: dark; }
@@ -39,171 +48,108 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: #020308;
+  background: #000000;            /* pure black — no background gradients (HIG) */
   color: var(--color-fg);
   font-family: var(--font-sans);
+  font-size: 17px;               /* Apple default text size */
+  line-height: 1.5;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+.bg-aurora { position: relative; z-index: 1; }
 
 /* ═══════════════════════════════════════════
-   AURORA BACKGROUND
-   Indigo orb top-left · Lime orb bottom-right
-   · Deep violet whisper at center
-═══════════════════════════════════════════ */
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 90vw 74vh at -8%  -20%, rgba(99,  102, 241, 0.30) 0%, transparent 58%),
-    radial-gradient(ellipse 65vw 55vh at 108% 112%, rgba(132, 204,  22, 0.15) 0%, transparent 56%),
-    radial-gradient(ellipse 50vw 42vh at 52%  48%,  rgba(109,  40, 217, 0.06) 0%, transparent 52%);
-  animation: aurora-drift 26s ease-in-out infinite alternate;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Fine dot grid — indigo tinted */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: radial-gradient(circle, rgba(99, 102, 241, 0.09) 1px, transparent 1px);
-  background-size: 44px 44px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-@keyframes aurora-drift {
-  0%   { transform: scale(1)    translate(0vw,   0vh);  opacity: 1;    }
-  28%  { transform: scale(1.04) translate(-3vw,  5vh);  opacity: 0.88; }
-  62%  { transform: scale(0.97) translate( 4vw, -3vh);  opacity: 0.94; }
-  100% { transform: scale(1.03) translate(-2vw,  2vh);  opacity: 1;    }
-}
-
-.bg-aurora {
-  position: relative;
-  z-index: 1;
-}
-
-/* ═══════════════════════════════════════════
-   GLASS CARDS — indigo-tinted iOS glass
+   LIQUID GLASS — translucent layered surfaces (Apple 2025)
+   No drop shadows; depth comes from blur + translucency.
 ═══════════════════════════════════════════ */
 
 .card {
-  background: linear-gradient(
-    135deg,
-    rgba(99, 102, 241, 0.07) 0%,
-    rgba(132, 204, 22,  0.025) 60%,
-    rgba(255, 255, 255, 0.015) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-top-color:  rgba(99, 102, 241, 0.32);   /* indigo light-edge */
-  border-left-color: rgba(255, 255, 255, 0.11);
-  border-radius: 1.5rem;
-  backdrop-filter: blur(44px) saturate(170%);
-  -webkit-backdrop-filter: blur(44px) saturate(170%);
-  box-shadow:
-    inset 0 1px 0 rgba(99, 102, 241, 0.16),
-    inset 1px 0 0 rgba(255, 255, 255, 0.05),
-    0 24px 64px -12px rgba(0, 0, 0, 0.72),
-    0  4px 16px  -4px rgba(0, 0, 0, 0.48);
-  position: relative;          /* needed for ::before noise overlay */
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;                 /* concentric outer radius */
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  position: relative;
 }
 
-/* Indigo glow — primary highlight */
-.card-glow {
-  box-shadow:
-    inset 0 1px 0 rgba(99, 102, 241, 0.20),
-    inset 1px 0 0 rgba(255, 255, 255, 0.06),
-    0 0  0   1px rgba(99, 102, 241, 0.28),
-    0 0  80px -6px rgba(99, 102, 241, 0.40),
-    0 24px 64px -12px rgba(0, 0, 0, 0.72);
-}
-
-/* Lime glow — used on Learn page action cards */
-.card-glow-lime {
-  box-shadow:
-    inset 0 1px 0 rgba(132, 204, 22, 0.16),
-    inset 1px 0 0 rgba(255, 255, 255, 0.05),
-    0 0  0   1px rgba(132, 204, 22, 0.25),
-    0 0  70px -6px rgba(132, 204, 22, 0.28),
-    0 24px 64px -12px rgba(0, 0, 0, 0.72);
-}
+/* Emphasis = a brighter glass edge, not a glow. */
+.card-glow      { border-color: rgba(10, 132, 255, 0.45); }
+.card-glow-lime { border-color: rgba(48, 209, 88, 0.42); }
 
 /* ═══════════════════════════════════════════
-   GLASS NAVIGATION BAR
+   NAVIGATION — Liquid Glass chrome
 ═══════════════════════════════════════════ */
 
 .glass-nav {
-  background: rgba(2, 3, 8, 0.80);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.14);
-  backdrop-filter: blur(36px) saturate(160%);
-  -webkit-backdrop-filter: blur(36px) saturate(160%);
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Liquid Glass pill (floating badges) */
+.lg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* ═══════════════════════════════════════════
-   INPUTS
-═══════════════════════════════════════════ */
-
-.bd-input {
-  width: 100%;
-  border-radius: 0.875rem;
-  background: rgba(99, 102, 241, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-top-color: rgba(99, 102, 241, 0.22);
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
-  color: var(--color-fg);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.bd-input:focus {
-  border-color: rgba(99, 102, 241, 0.72);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
-}
-.bd-input::placeholder { color: #384060; }
-
-/* ═══════════════════════════════════════════
-   ANIMATIONS
+   MOTION — Apple easing, short and intentional
 ═══════════════════════════════════════════ */
 
 @keyframes float-y {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-9px); }
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
 }
 .float { animation: float-y 5s ease-in-out infinite; }
+
+/* Pulsing status dot on the floating badges */
+@keyframes pulse-dot {
+  0%   { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.pulse-dot { position: relative; }
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: inherit;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Shield checkmark draw-on-load */
+@keyframes draw-check {
+  to { stroke-dashoffset: 0; }
+}
+.draw-check {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: draw-check 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.3s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float, .pulse-dot::after { animation: none; }
+  .draw-check { stroke-dashoffset: 0; animation: none; }
+}
 
 /* ═══════════════════════════════════════════
    SCROLLBAR
 ═══════════════════════════════════════════ */
 
-::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar              { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track        { background: transparent; }
-::-webkit-scrollbar-thumb        { background: rgba(99, 102, 241, 0.30); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover  { background: rgba(99, 102, 241, 0.55); }
-
-/* ═══════════════════════════════════════════
-   UTILITIES
-═══════════════════════════════════════════ */
-
-.text-glow-indigo {
-  text-shadow: 0 0 28px rgba(99, 102, 241, 0.75), 0 0 60px rgba(99, 102, 241, 0.25);
-}
-.text-glow-lime {
-  text-shadow: 0 0 24px rgba(132, 204, 22, 0.70), 0 0 50px rgba(132, 204, 22, 0.22);
-}
-
-/* Noise micro-texture overlay on cards */
-.card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-  opacity: 0.32;
-  pointer-events: none;
-  mix-blend-mode: overlay;
-}
+::-webkit-scrollbar-thumb        { background: rgba(255, 255, 255, 0.18); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover  { background: rgba(255, 255, 255, 0.3); }

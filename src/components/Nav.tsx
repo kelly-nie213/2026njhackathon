@@ -2,13 +2,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Brand } from "./Brand";
 
 const NAV_ITEMS = [
-  { path: "/",           label: "Breach Detector",  icon: "🔍" },
-  { path: "/phishing",   label: "Phishing Checker", icon: "✉️" },
-  { path: "/triage",     label: "Incident Triage",  icon: "⚡" },
-  { path: "/code-audit", label: "Code Auditor",     icon: "</>" },
-  { path: "/tiam",        label: "TIAM & ZKP",       icon: "🗝️" },
-  { path: "/credentials", label: "Credential Check", icon: "🔑" },
-  { path: "/learn",       label: "Learn & Protect",  icon: "🛡️" },
+  { path: "/",             label: "Breach Detector",  short: "Scan" },
+  { path: "/phishing",     label: "Phishing Checker", short: "Phishing" },
+  { path: "/triage",       label: "Incident Triage",  short: "Triage" },
+  { path: "/tiam",         label: "TIAM & ZKP",       short: "TIAM" },
+  { path: "/credentials",  label: "Credential Check", short: "Creds" },
+  { path: "/learn",        label: "Learn & Protect",  short: "Learn" },
 ];
 
 export function Nav() {
@@ -36,8 +35,8 @@ export function Nav() {
                     : "text-muted hover:text-fg hover:bg-white/[0.07]"
                 }`}
               >
-                <span className="hidden lg:inline">{item.icon} {item.label}</span>
-                <span className="lg:hidden">{item.icon}</span>
+                <span className="hidden lg:inline">{item.label}</span>
+                <span className="lg:hidden">{item.short}</span>
               </button>
             );
           })}

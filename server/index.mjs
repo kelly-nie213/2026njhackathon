@@ -12,6 +12,8 @@ import { checkDomainSecurity } from "./domaincheck.mjs";
 import { breachBloomFilter } from "./bloomfilter.mjs";
 import { breachMerkleTree, verifyProof } from "./merkle.mjs";
 import { registerIdentity, issueChallenge, verifyChallenge, getIdentity } from "./tiamstore.mjs";
+import { checkWebSecurity } from "./webheaders.mjs";
+import { checkReputation } from "./reputation.mjs";
 
 const PORT = process.env.PORT || 8787;
 
@@ -73,6 +75,38 @@ function parseJsonContent(message) {
     .map((b) => b.text)
     .join("");
   return JSON.parse(text);
+}
+
+/**
+ * Multi-turn AI call returning plain text — used for the conversational advisor.
+ * @param {string} system  System/instruction prompt
+ * @param {Array<{role:string,content:string}>} messages  Conversation history
+ * @returns {Promise<string>}
+ */
+async function callAiConversation(system, messages) {
+  if (anthropic) {
+    const result = await anthropic.messages.create({
+      model:        "claude-opus-4-8",
+      max_tokens:   2000,
+      thinking:     { type: "adaptive" },
+      output_config: { effort: "low" },
+      system,
+      messages,
+    });
+    return result.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  }
+  if (geminiAI) {
+    const model = geminiAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: system });
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+    const lastContent = messages[messages.length - 1].content;
+    const chat = model.startChat({ history });
+    const result = await chat.sendMessage(lastContent);
+    return result.response.text().trim();
+  }
+  throw new Error("no_ai_provider");
 }
 
 const PHISHING_SCHEMA = {
@@ -350,10 +384,44 @@ app.post("/api/domain-check", async (req, res) => {
   }
 });
 
+// BreachDetector: live check of TLS + HTTP security headers (how the site is served).
+app.post("/api/web-security", async (req, res) => {
+  const { domain } = req.body ?? {};
+  if (!domain || typeof domain !== "string") {
+    return res.status(400).json({ error: "domain_required" });
+  }
+  try {
+    const result = await checkWebSecurity(domain);
+    res.json(result);
+  } catch (err) {
+    const msg = err?.message || "web_security_error";
+    const code = msg === "invalid_domain" ? 400 : 500;
+    console.error("web-security error:", msg);
+    res.status(code).json({ error: msg });
+  }
+});
+
+// BreachDetector: live threat-intel / reputation lookup (URLhaus, OpenPhish, +keys).
+app.post("/api/reputation", async (req, res) => {
+  const { domain } = req.body ?? {};
+  if (!domain || typeof domain !== "string") {
+    return res.status(400).json({ error: "domain_required" });
+  }
+  try {
+    const result = await checkReputation(domain);
+    res.json(result);
+  } catch (err) {
+    const msg = err?.message || "reputation_error";
+    const code = msg === "invalid_domain" ? 400 : 500;
+    console.error("reputation error:", msg);
+    res.status(code).json({ error: msg });
+  }
+});
+
 // BreachDetector: turn raw exposure findings into risks + a plain-language plan.
 app.post("/api/breach-report", async (req, res) => {
   if (!hasAi) return res.status(503).json({ error: "no_api_key" });
-  const { orgName, domain, emails, names, phones, breaches, domainSecurity } = req.body ?? {};
+  const { orgName, domain, emails, names, phones, breaches, domainSecurity, webSecurity, reputation, codeSecurity } = req.body ?? {};
   try {
     const breachLines = (breaches || [])
       .map((b) => `- ${b.email}: ${b.breachCount} breach(es)${b.breaches?.length ? ` (${b.breaches.map((x) => x.title).join(", ")})` : ""}`)
@@ -364,10 +432,27 @@ app.post("/api/breach-report", async (req, res) => {
           .map((c) => `- ${c.label} [${c.status}]: ${c.title}`)
           .join("\n")
       : "Email-spoofing protection: not checked";
+    const webLines = webSecurity
+      ? `Web security headers / TLS (live check) — grade ${webSecurity.grade}; issues found:\n` +
+        ((webSecurity.checks || []).length
+          ? webSecurity.checks.map((c) => `- ${c.label} [${c.status}]: ${c.title}`).join("\n")
+          : "- none (all good)")
+      : "Web security headers: not checked";
+    const repLines = reputation
+      ? reputation.flagged
+        ? `Threat-intelligence reputation (live): FLAGGED — ${(reputation.hits || []).map((c) => `${c.label}: ${c.title}`).join("; ")}`
+        : "Threat-intelligence reputation (live): not flagged on the sources checked"
+      : "Threat-intelligence reputation: not checked";
+    const codeLines = codeSecurity
+      ? `Website code audit (the JavaScript the site ships): ${codeSecurity.security || 0} security + ${codeSecurity.bug || 0} code-quality issue(s)` +
+        (codeSecurity.top?.length ? `. Examples: ${codeSecurity.top.join("; ")}` : "") +
+        ". Note many findings are in third-party widgets the nonprofit can't edit directly."
+      : "Website code audit: no issues (or not run)";
     const report = await callAi(
       "You advise small nonprofits with no IT staff. A scan of their public website found staff emails, " +
-      "names and phone numbers, checked those emails against known data breaches, and checked via live DNS " +
-      "whether the domain can be spoofed in email (SPF/DMARC/DKIM). " +
+      "names and phone numbers, checked those emails against known data breaches, checked via live DNS " +
+      "whether the domain can be spoofed in email (SPF/DMARC/DKIM), checked the site's TLS certificate and " +
+      "HTTP security headers (CSP/HSTS/X-Frame-Options, etc.), and statically scanned the JavaScript the site ships. " +
       "Explain, in plain language a volunteer can act on, the concrete RISKS this exposure creates " +
       "(who an attacker could impersonate, what a breached password lets them do, how harvested names/phones enable " +
       "phishing and vishing, and what an unprotected domain lets attackers send), the real-world CONSEQUENCES, and WHO is at risk. " +
@@ -379,6 +464,9 @@ app.post("/api/breach-report", async (req, res) => {
       `Public phone numbers found: ${(phones || []).join(", ") || "none"}\n\n` +
       `Breach exposure per email:\n${breachLines || "none checked"}\n\n` +
       `${domainLines}\n\n` +
+      `${webLines}\n\n` +
+      `${repLines}\n\n` +
+      `${codeLines}\n\n` +
       `Write a 2-3 sentence summary, 3-5 risks, and 4-6 ordered action steps. ` +
       `Return JSON matching: { summary: string, risks: [{ title, severity, consequence, whoAtRisk }], actions: [{ title, why, effort, steps }] }`,
       BREACH_REPORT_SCHEMA,
@@ -445,6 +533,7 @@ app.post("/api/js-report", async (req, res) => {
   }
 });
 
+
 // Turn a described security incident into calm, ordered recovery guidance.
 app.post("/api/triage", async (req, res) => {
   if (!hasAi) return res.status(503).json({ error: "no_api_key" });
@@ -491,6 +580,79 @@ app.post("/api/phishing", async (req, res) => {
     res.json(report);
   } catch (err) {
     console.error("phishing error:", err?.message || err);
+    res.status(502).json({ error: "ai_error" });
+  }
+});
+
+// Personalized advisor: a grounded chat over the user's actual scan results.
+// Guided plan + free-form follow-ups, tailored to the person's role/comfort/budget.
+function formatScanContext(ctx = {}, profile = {}) {
+  const lines = [];
+  lines.push(`Organization: ${ctx.orgName || ctx.domain || "a small nonprofit"} (domain ${ctx.domain || "unknown"}).`);
+  if (profile.role || profile.comfort || profile.budget) {
+    lines.push(
+      `About the person asking: role = ${profile.role || "unspecified"}; ` +
+        `tech comfort = ${profile.comfort || "unspecified"}; budget = ${profile.budget || "unspecified"}.`
+    );
+  }
+  lines.push("");
+  lines.push("SCAN RESULTS:");
+  lines.push(`- Public emails found: ${ctx.emails ?? 0}; names: ${ctx.names ?? 0}; phones: ${ctx.phones ?? 0}`);
+  if (Array.isArray(ctx.breachedEmails) && ctx.breachedEmails.length) {
+    lines.push(`- Emails in known breaches:`);
+    for (const b of ctx.breachedEmails.slice(0, 12)) {
+      lines.push(`    • ${b.email}: ${b.count} breach(es)${b.breaches?.length ? ` (${b.breaches.slice(0, 5).join(", ")})` : ""}`);
+    }
+  } else {
+    lines.push(`- No emails found in known breaches.`);
+  }
+  if (ctx.domainSecurity) {
+    lines.push(`- Email spoofing (DNS): domain is ${ctx.domainSecurity.spoofable ? "SPOOFABLE" : "reasonably protected"}.` +
+      (ctx.domainSecurity.issues?.length ? ` Issues: ${ctx.domainSecurity.issues.join("; ")}` : ""));
+  }
+  if (ctx.webSecurity) {
+    lines.push(`- Web security headers / TLS: grade ${ctx.webSecurity.grade}.` +
+      (ctx.webSecurity.issues?.length ? ` Issues: ${ctx.webSecurity.issues.join("; ")}` : ""));
+  }
+  if (ctx.reputation) {
+    lines.push(`- Threat-intel reputation: ${ctx.reputation.flagged ? `FLAGGED — ${(ctx.reputation.hits || []).join("; ")}` : "not flagged on the sources checked"}.`);
+  }
+  if (ctx.code) {
+    lines.push(`- Website code audit: ${ctx.code.security || 0} security + ${ctx.code.bug || 0} quality findings.` +
+      (ctx.code.top?.length ? ` Top: ${ctx.code.top.slice(0, 6).join("; ")}` : ""));
+  }
+  if (Array.isArray(ctx.topRisks) && ctx.topRisks.length) {
+    lines.push(`- Assessed top risks: ${ctx.topRisks.slice(0, 6).join("; ")}`);
+  }
+  return lines.join("\n");
+}
+
+app.post("/api/advisor", async (req, res) => {
+  if (!hasAi) return res.status(503).json({ error: "no_api_key" });
+  const { context, profile, messages } = req.body ?? {};
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: "messages_required" });
+  }
+  try {
+    const convo = messages
+      .slice(-12)
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+    if (convo.length === 0 || convo[0].role !== "user") {
+      return res.status(400).json({ error: "messages_required" });
+    }
+    const systemPrompt =
+      "You are Aegis, a calm, encouraging cybersecurity advisor for a small nonprofit that has no IT staff. " +
+      "You are given the real results of a security scan of their website plus some context about the person asking. " +
+      "Give specific, prioritized, plain-language advice tailored to THEIR actual findings and THEIR situation " +
+      "(role, tech comfort, budget). Always ground answers in the scan results below — reference the specific findings. " +
+      "When they ask how to do something, give short numbered steps. Recommend free/low-cost tools when budget is tight. " +
+      "Be concise and concrete; no jargon, no blame, never invent findings that aren't in the results.\n\n" +
+      formatScanContext(context, profile);
+    const reply = await callAiConversation(systemPrompt, convo);
+    res.json({ reply });
+  } catch (err) {
+    console.error("advisor error:", err?.message || err);
     res.status(502).json({ error: "ai_error" });
   }
 });
