@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brand } from "../components/Brand";
+import { Nav } from "../components/Nav";
 import {
   QUESTIONS,
   triage,
@@ -20,6 +20,27 @@ function describe(answers: Answers): string {
   })
     .filter(Boolean)
     .join("\n");
+}
+
+/* ── Decorative alert icon ── */
+function AlertIcon() {
+  return (
+    <div className="relative">
+      <div className="absolute inset-0 rounded-full bg-risk-crit/20 blur-lg scale-150" />
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="ag" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor="#fb7185" />
+            <stop offset="100%" stopColor="#f43f5e" />
+          </linearGradient>
+        </defs>
+        {/* Triangle warning */}
+        <path d="M22 6 L40 36 L4 36 Z" fill="url(#ag)" opacity="0.2" stroke="url(#ag)" strokeWidth="1.5" strokeLinejoin="round"/>
+        <line x1="22" y1="17" x2="22" y2="27" stroke="#fb7185" strokeWidth="2.5" strokeLinecap="round"/>
+        <circle cx="22" cy="31.5" r="1.5" fill="#fb7185"/>
+      </svg>
+    </div>
+  );
 }
 
 export default function IncidentTriage() {
@@ -73,36 +94,33 @@ export default function IncidentTriage() {
   const steps = recovery ? recovery.steps : result?.steps ?? [];
 
   return (
-    <div className="bg-aurora min-h-full pb-16">
-      <header className="border-b border-white/8">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <Brand />
-          <button
-            onClick={() => nav("/")}
-            className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
-          >
-            ← Back
-          </button>
-        </div>
-      </header>
+    <div className="min-h-full pb-16">
+      <Nav />
 
       <main className="mx-auto max-w-3xl px-6 pt-8">
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> Incident triage
+        {/* Page header */}
+        <div className="mb-6">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> Incident triage
+          </div>
+          <div className="flex items-center gap-3">
+            <AlertIcon />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {done ? "Here's what to do" : "Something happened? Let's sort it out."}
+              </h1>
+              {!done && (
+                <p className="mt-0.5 text-sm text-muted">
+                  Answer a few quick questions. We'll tell you severity, what's reversible, and who to call.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {done ? "Here's what to do" : "Something happened? Let's sort it out."}
-        </h1>
-        {!done && (
-          <p className="mt-1 text-sm text-muted">
-            Answer a few quick questions. We'll tell you how serious it is, what can still be
-            undone, and exactly who to call — no jargon.
-          </p>
-        )}
 
-        {/* progress */}
+        {/* Progress bar */}
         {!done && (
-          <div className="mt-5 mb-6 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
             <motion.div
               className="h-full rounded-full bg-gradient-to-r from-brand-500 to-accent-500"
               animate={{ width: `${((step + (selected.length ? 1 : 0)) / QUESTIONS.length) * 100}%` }}
@@ -182,7 +200,7 @@ export default function IncidentTriage() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-5"
             >
-              {/* severity + reversibility */}
+              {/* Severity + reversibility */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="card p-5">
                   <div className="text-xs font-medium uppercase tracking-wide text-muted">Severity</div>
@@ -205,11 +223,9 @@ export default function IncidentTriage() {
                     className="mt-2 text-sm font-semibold"
                     style={{
                       color:
-                        result.reversible === "hard"
-                          ? "var(--color-risk-crit)"
-                          : result.reversible === "partial"
-                            ? "var(--color-risk-med)"
-                            : "var(--color-risk-low)",
+                        result.reversible === "hard"    ? "var(--color-risk-crit)"
+                        : result.reversible === "partial" ? "var(--color-risk-med)"
+                        : "var(--color-risk-low)",
                     }}
                   >
                     {result.reversible === "hard"
@@ -222,7 +238,7 @@ export default function IncidentTriage() {
                 </div>
               </div>
 
-              {/* who to notify */}
+              {/* Who to notify */}
               <div className="card p-5">
                 <h3 className="mb-3 text-base font-bold">Who to notify</h3>
                 <div className="space-y-2.5">
@@ -244,21 +260,21 @@ export default function IncidentTriage() {
                 </div>
               </div>
 
-              {/* recovery steps */}
+              {/* Recovery steps */}
               <div className="card card-glow p-5">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <h3 className="text-base font-bold">Do this now</h3>
                   <button
                     onClick={runAi}
                     disabled={loading}
-                    className="ml-auto rounded-lg border border-brand-400/40 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20 disabled:opacity-50"
+                    className="ml-auto rounded-xl border border-brand-400/40 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20 disabled:opacity-50"
                   >
                     {loading ? "Thinking…" : recovery ? "↻ Regenerate" : "✦ AI recovery guidance"}
                   </button>
                 </div>
                 {recovery && <p className="mb-3 text-sm text-muted">{recovery.summary}</p>}
                 {recovery?.source === "fallback" && (
-                  <div className="mb-3 rounded-lg bg-white/[0.03] px-3 py-2 text-[11px] text-muted">
+                  <div className="mb-3 rounded-xl bg-white/[0.03] px-3 py-2 text-[11px] text-muted">
                     Built-in guidance — add an <span className="text-fg">ANTHROPIC_API_KEY</span> for
                     advice tailored to your exact situation.
                   </div>
@@ -278,7 +294,7 @@ export default function IncidentTriage() {
               <div className="flex gap-3">
                 <button
                   onClick={restart}
-                  className="rounded-xl border border-white/12 px-4 py-2 text-sm text-muted transition hover:border-white/30 hover:text-fg"
+                  className="rounded-xl border border-white/10 px-4 py-2 text-sm text-muted transition hover:border-white/25 hover:text-fg"
                 >
                   Start over
                 </button>

@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brand } from "../components/Brand";
+import { Nav } from "../components/Nav";
 import {
   auditJs,
   generateJsReport,
@@ -22,8 +21,110 @@ const SCAN_STEPS = [
   "Writing your plain-language fix plan…",
 ];
 
+/* ── Decorative code-shield SVG ── */
+function CodeShieldGraphic() {
+  return (
+    <div className="relative flex justify-center lg:justify-start float">
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{
+          background: "radial-gradient(ellipse, rgba(99,102,241,0.24) 0%, transparent 70%)",
+          filter: "blur(40px)",
+          transform: "scale(1.4)",
+        }}
+      />
+
+      <svg
+        width="240"
+        height="240"
+        viewBox="0 0 240 240"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ filter: "drop-shadow(0 0 22px rgba(99,102,241,0.45))" }}
+      >
+        <defs>
+          <linearGradient id="csg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor="#818cf8" stopOpacity="0.92" />
+            <stop offset="100%" stopColor="#a3e635" stopOpacity="0.80" />
+          </linearGradient>
+          <radialGradient id="csh" cx="50%" cy="38%" r="55%">
+            <stop offset="0%"   stopColor="white" stopOpacity="0.26" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="crg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor="#6366f1" stopOpacity="0.52" />
+            <stop offset="50%"  stopColor="#a3e635" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.52" />
+          </linearGradient>
+        </defs>
+
+        {/* Outer ring */}
+        <motion.g
+          animate={{ rotate: 360 }}
+          transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+          style={{ transformOrigin: "120px 120px" }}
+        >
+          <circle cx="120" cy="120" r="108" stroke="url(#crg)" strokeWidth="1" fill="none" strokeDasharray="6 12"/>
+          <circle cx="228" cy="120" r="4.5" fill="#818cf8"/>
+          <circle cx="120" cy="12"  r="3.5" fill="#a3e635"/>
+          <circle cx="12"  cy="120" r="4"   fill="#818cf8"/>
+          <circle cx="120" cy="228" r="3.5" fill="#34d399"/>
+        </motion.g>
+
+        {/* Inner ring */}
+        <motion.g
+          animate={{ rotate: -360 }}
+          transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+          style={{ transformOrigin: "120px 120px" }}
+        >
+          <circle cx="120" cy="120" r="78" stroke="rgba(6,182,212,0.20)" strokeWidth="0.8" fill="none" strokeDasharray="3 8"/>
+          <circle cx="198" cy="120" r="2.5" fill="#a3e635" opacity="0.75"/>
+          <circle cx="120" cy="42"  r="2"   fill="#818cf8" opacity="0.75"/>
+        </motion.g>
+
+        {/* Shield */}
+        <path d="M120 44 L170 68 L170 122 Q170 170 120 190 Q70 170 70 122 L70 68 Z" fill="url(#csg)"/>
+        <path d="M120 54 L160 76 L160 122 Q160 162 120 178 Q80 162 80 122 L80 76 Z" fill="url(#csh)"/>
+
+        {/* Code brackets inside shield */}
+        <text x="120" y="133" textAnchor="middle" fontSize="28" fontFamily="'SF Mono',monospace"
+          fontWeight="800" fill="white" opacity="0.9">
+          {"</>"}
+        </text>
+
+        {/* Status badges */}
+        <motion.g animate={{ opacity: [0.7, 1, 0.7] }} transition={{ duration: 2.8, repeat: Infinity }}>
+          <rect x="164" y="80" width="58" height="20" rx="10" fill="rgba(34,211,238,0.12)" stroke="rgba(34,211,238,0.35)" strokeWidth="0.8"/>
+          <text x="193" y="94" textAnchor="middle" fontSize="8.5" fill="#22d3ee" fontFamily="'SF Mono',monospace" fontWeight="700" letterSpacing="0.5">
+            AUDITING
+          </text>
+        </motion.g>
+        <g opacity="0.85">
+          <rect x="18" y="96" width="52" height="20" rx="10" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.35)" strokeWidth="0.8"/>
+          <text x="44" y="110" textAnchor="middle" fontSize="8.5" fill="#34d399" fontFamily="'SF Mono',monospace" fontWeight="700" letterSpacing="0.5">
+            SECURE
+          </text>
+        </g>
+        <motion.g animate={{ opacity: [0.5, 0.85, 0.5] }} transition={{ duration: 3.5, repeat: Infinity, delay: 0.6 }}>
+          <rect x="166" y="152" width="54" height="20" rx="10" fill="rgba(251,191,36,0.12)" stroke="rgba(251,191,36,0.35)" strokeWidth="0.8"/>
+          <text x="193" y="166" textAnchor="middle" fontSize="8.5" fill="#fbbf24" fontFamily="'SF Mono',monospace" fontWeight="700" letterSpacing="0.5">
+            PATCHING
+          </text>
+        </motion.g>
+
+        {/* Scan line */}
+        <motion.line
+          x1="70" y1="122" x2="170" y2="122"
+          stroke="rgba(34,211,238,0.45)" strokeWidth="1"
+          animate={{ y1: [68, 172, 68], y2: [68, 172, 68], opacity: [0, 0.6, 0] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </svg>
+    </div>
+  );
+}
+
 export default function CodeAuditor() {
-  const nav = useNavigate();
   const [phase, setPhase] = useState<Phase>("input");
   const [domain, setDomain] = useState("");
   const [orgName, setOrgName] = useState("");
@@ -76,78 +177,47 @@ export default function CodeAuditor() {
   };
 
   return (
-    <div className="bg-aurora min-h-full pb-16">
-      <header className="border-b border-white/8">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Brand />
-          <button
-            onClick={() => nav("/")}
-            className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
-          >
-            ← Back
-          </button>
-        </div>
-      </header>
+    <div className="min-h-full pb-16">
+      <Nav />
 
       <main className="mx-auto max-w-5xl px-6">
         <AnimatePresence mode="wait">
           {phase === "input" && (
             <InputView
               key="input"
-              orgName={orgName}
-              setOrgName={setOrgName}
-              domain={domain}
-              setDomain={setDomain}
-              canSubmit={canSubmit}
-              error={error}
+              orgName={orgName} setOrgName={setOrgName}
+              domain={domain}   setDomain={setDomain}
+              canSubmit={canSubmit} error={error}
               onSubmit={run}
-              onExample={() => {
-                setOrgName("AYLUS");
-                setDomain("aylus.org");
-              }}
+              onExample={() => { setOrgName("AYLUS"); setDomain("aylus.org"); }}
             />
           )}
 
-          {phase === "scanning" && <ScanningView key="scanning" step={step} domain={cleanDomain} />}
+          {phase === "scanning" && (
+            <ScanningView key="scanning" step={step} domain={cleanDomain} />
+          )}
 
           {phase === "report" && audit && report && (
             <ReportView
               key="report"
               orgName={orgName.trim() || audit.domain}
-              audit={audit}
-              report={report}
-              reportSource={reportSource}
-              onReset={resetAll}
+              audit={audit} report={report}
+              reportSource={reportSource} onReset={resetAll}
             />
           )}
         </AnimatePresence>
       </main>
-
-      <style>{`
-        .bd-input {
-          width: 100%; border-radius: 0.75rem;
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
-          padding: 0.7rem 0.9rem; font-size: 0.95rem; color: var(--color-fg);
-          outline: none; transition: border-color .15s, box-shadow .15s;
-        }
-        .bd-input:focus { border-color: var(--color-brand-400); box-shadow: 0 0 0 3px rgba(139,92,246,0.18); }
-        .bd-input::placeholder { color: #6b6b85; }
-      `}</style>
     </div>
   );
 }
 
-/* ----------------------------- Input ----------------------------- */
+/* ──────────── Input ──────────── */
 
 function InputView(props: {
-  orgName: string;
-  setOrgName: (v: string) => void;
-  domain: string;
-  setDomain: (v: string) => void;
-  canSubmit: boolean;
-  error: string | null;
-  onSubmit: () => void;
-  onExample: () => void;
+  orgName: string; setOrgName: (v: string) => void;
+  domain: string;  setDomain:  (v: string) => void;
+  canSubmit: boolean; error: string | null;
+  onSubmit: () => void; onExample: () => void;
 }) {
   const { orgName, setOrgName, domain, setDomain, canSubmit, error, onSubmit, onExample } = props;
   return (
@@ -170,25 +240,12 @@ function InputView(props: {
           in your website's code?
         </h1>
         <p className="mt-5 max-w-md text-[15px] leading-relaxed text-muted">
-          Enter your domain. The Code Auditor reads the JavaScript your site actually ships to
-          visitors and scans it for leaked keys, cross-site-scripting holes, insecure requests,
-          outdated libraries and leftover debug code — then explains, in plain English, which ones
-          matter and how to fix them.
+          Enter your domain. The Code Auditor reads the JavaScript your site ships to visitors and
+          scans it for leaked keys, XSS holes, insecure requests, outdated libraries and leftover debug
+          code — then explains which ones matter and how to fix them.
         </p>
-        <ul className="mt-7 space-y-3 text-sm">
-          {[
-            "Finds hardcoded API keys, tokens & passwords in your code",
-            "Flags XSS sinks, insecure http:// calls & known-vulnerable libraries",
-            "Turns it into a prioritized, jargon-free fix plan",
-          ].map((t) => (
-            <li key={t} className="flex items-start gap-3 text-fg/90">
-              <span className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full bg-brand-500/20 text-brand-300">
-                ✓
-              </span>
-              {t}
-            </li>
-          ))}
-        </ul>
+
+        <CodeShieldGraphic />
       </div>
 
       <div className="card card-glow p-7">
@@ -209,7 +266,7 @@ function InputView(props: {
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium text-muted">
-              Organization name (optional)
+              Organization name <span className="text-muted/60">(optional)</span>
             </span>
             <input
               value={orgName}
@@ -222,7 +279,7 @@ function InputView(props: {
         </div>
 
         {error && (
-          <div className="mt-4 rounded-lg border border-risk-high/30 bg-risk-crit/10 px-3 py-2 text-xs text-risk-high">
+          <div className="mt-4 rounded-xl border border-risk-high/30 bg-risk-crit/10 px-3 py-2.5 text-xs text-risk-high">
             {error}
           </div>
         )}
@@ -240,12 +297,18 @@ function InputView(props: {
         >
           Try it with aylus.org
         </button>
+
+        <div className="mt-5 flex items-center justify-center gap-4 border-t border-white/[0.06] pt-4">
+          {["🔒 Read-only", "🧬 Deep analysis", "⚡ AI-powered"].map((b) => (
+            <span key={b} className="text-[11px] text-muted">{b}</span>
+          ))}
+        </div>
       </div>
     </motion.div>
   );
 }
 
-/* ---------------------------- Scanning ---------------------------- */
+/* ──────────── Scanning ──────────── */
 
 function ScanningView({ step, domain }: { step: number; domain: string }) {
   return (
@@ -301,14 +364,11 @@ function ScanningView({ step, domain }: { step: number; domain: string }) {
   );
 }
 
-/* ----------------------------- Report ----------------------------- */
+/* ──────────── Report ──────────── */
 
 function ReportView(props: {
-  orgName: string;
-  audit: JsAuditResult;
-  report: JsReport;
-  reportSource: "ai" | "fallback";
-  onReset: () => void;
+  orgName: string; audit: JsAuditResult; report: JsReport;
+  reportSource: "ai" | "fallback"; onReset: () => void;
 }) {
   const { orgName, audit, report, reportSource, onReset } = props;
   const top = worstSeverity(audit);
@@ -332,17 +392,17 @@ function ReportView(props: {
         </div>
         <button
           onClick={onReset}
-          className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
+          className="rounded-xl border border-white/10 px-3 py-1.5 text-xs text-muted transition hover:border-white/25 hover:text-fg"
         >
           ↺ Scan another site
         </button>
       </div>
 
-      {/* stat row */}
+      {/* Stat row */}
       <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="Security issues" value={audit.counts.security || 0} accent="crit" />
-        <Stat label="Code-quality issues" value={audit.counts.bug || 0} accent="med" />
-        <Stat label="Critical / high" value={(audit.counts.critical || 0) + (audit.counts.high || 0)} accent="high" />
+        <Stat label="Security issues"     value={audit.counts.security || 0}     accent="crit" />
+        <Stat label="Code-quality issues" value={audit.counts.bug || 0}          accent="med"  />
+        <Stat label="Critical / high"     value={(audit.counts.critical || 0) + (audit.counts.high || 0)} accent="high" />
         <div className="card p-5">
           <div className="text-xs text-muted">Highest severity</div>
           <div className="mt-2 text-2xl font-extrabold" style={{ color: topMeta.color }}>
@@ -351,7 +411,7 @@ function ReportView(props: {
         </div>
       </div>
 
-      {/* AI / fallback summary + recommendations */}
+      {/* Summary */}
       <div className="card card-glow p-6">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-bold">Summary & fix plan</h2>
@@ -366,7 +426,7 @@ function ReportView(props: {
           {report.recommendations.map((rec, i) => (
             <details
               key={i}
-              className="group rounded-xl border border-white/8 bg-white/[0.02] p-4 open:border-brand-400/40"
+              className="group rounded-xl border border-white/8 bg-white/[0.025] p-4 open:border-brand-400/40"
               open={i === 0}
             >
               <summary className="flex cursor-pointer list-none items-center gap-3">
@@ -394,50 +454,45 @@ function ReportView(props: {
           ))}
         </div>
         {reportSource === "fallback" && (
-          <div className="mt-4 rounded-lg bg-white/[0.03] px-3 py-2 text-[11px] text-muted">
+          <div className="mt-4 rounded-xl bg-white/[0.03] px-3 py-2 text-[11px] text-muted">
             Showing the built-in plan — add an <span className="text-fg">ANTHROPIC_API_KEY</span> to
             generate one tailored to your exact findings.
           </div>
         )}
       </div>
 
-      {/* findings list */}
+      {/* Findings */}
       <div className="card p-6">
         <h2 className="mb-1 text-lg font-bold">What we found in your code</h2>
         <p className="mb-4 text-sm text-muted">
-          Each item shows the file and line. Items marked{" "}
-          <span className="rounded border border-white/10 px-1 py-0.5 text-[10px]">3rd-party</span> come
-          from widgets/libraries you likely can't edit directly — update or replace them instead.
+          Items marked{" "}
+          <span className="rounded border border-white/10 px-1 py-0.5 text-[10px]">3rd-party</span>
+          {" "}come from libraries — update or replace them instead of editing directly.
         </p>
 
         {hasFindings ? (
           <div className="space-y-2.5">
-            {audit.findings.map((f, i) => (
-              <FindingRow key={i} f={f} />
-            ))}
+            {audit.findings.map((f, i) => <FindingRow key={i} f={f} />)}
           </div>
         ) : (
-          <p className="rounded-lg bg-white/[0.03] px-3 py-3 text-sm text-muted">
-            No bugs or security risks were flagged in the scripts we scanned — nice. Keep your site
-            and its plugins up to date to stay that way.
+          <p className="rounded-xl bg-white/[0.03] px-3 py-3 text-sm text-muted">
+            No bugs or security risks were flagged — nice. Keep your site and plugins up to date.
           </p>
         )}
       </div>
 
-      {/* scripts scanned */}
+      {/* Scripts scanned */}
       <div className="card p-6">
         <h2 className="mb-3 text-lg font-bold">
           Scripts scanned ({audit.scriptsScanned.length}
           {audit.externalFound > audit.scriptsScanned.length
-            ? ` of ${audit.externalFound} found`
-            : ""}
-          )
+            ? ` of ${audit.externalFound} found` : ""})
         </h2>
         <div className="flex flex-wrap gap-1.5">
           {audit.scriptsScanned.map((s) => (
             <span
               key={s.url + s.file}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[11px]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[11px]"
               title={s.url}
             >
               {s.party === 0 ? "🏠" : "🌐"} {s.file}
@@ -450,10 +505,12 @@ function ReportView(props: {
   );
 }
 
+/* ──────────── Sub-components ──────────── */
+
 function FindingRow({ f }: { f: JsFinding }) {
   const m = SEVERITY_META[f.severity];
   return (
-    <details className="group rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+    <details className="group rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3">
       <summary className="flex cursor-pointer list-none items-center gap-3">
         <span
           className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
@@ -477,7 +534,7 @@ function FindingRow({ f }: { f: JsFinding }) {
         <div className="text-[11px] text-muted">
           <span className="font-mono">{f.file}</span> · line {f.line}
         </div>
-        <pre className="overflow-x-auto rounded-lg bg-ink-900/60 px-3 py-2 font-mono text-[11px] leading-relaxed text-fg/80">
+        <pre className="overflow-x-auto rounded-xl bg-ink-900/60 px-3 py-2 font-mono text-[11px] leading-relaxed text-fg/80">
           {f.snippet}
         </pre>
       </div>
@@ -485,21 +542,11 @@ function FindingRow({ f }: { f: JsFinding }) {
   );
 }
 
-function Stat({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string | number;
-  accent: "crit" | "high" | "med";
-}) {
+function Stat({ label, value, accent }: { label: string; value: string | number; accent: "crit" | "high" | "med" }) {
   const color =
-    accent === "crit"
-      ? "var(--color-risk-crit)"
-      : accent === "high"
-        ? "var(--color-risk-high)"
-        : "var(--color-risk-med)";
+    accent === "crit" ? "var(--color-risk-crit)"
+    : accent === "high" ? "var(--color-risk-high)"
+    : "var(--color-risk-med)";
   return (
     <div className="card p-5">
       <div className="text-xs text-muted">{label}</div>
