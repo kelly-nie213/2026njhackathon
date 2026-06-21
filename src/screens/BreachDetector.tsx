@@ -16,6 +16,14 @@ import {
   type DomainSecurity,
   type EmailBreach,
 } from "../lib/breach";
+import {
+  auditJs,
+  generateJsReport,
+  worstSeverity,
+  type JsAuditResult,
+  type JsReport,
+  type JsFinding,
+} from "../lib/jsaudit";
 
 type Phase = "input" | "scanning" | "report";
 
@@ -25,6 +33,7 @@ const SCAN_STEPS = [
   "Extracting emails, names & phone numbers…",
   "Checking your domain's email-spoofing protection (DNS)…",
   "Checking each email against breach databases…",
+  "Scanning your site's code for bugs & security holes…",
   "Assessing risks and writing your action plan…",
 ];
 
@@ -41,6 +50,9 @@ export default function BreachDetector() {
   const [domainSec, setDomainSec] = useState<DomainSecurity | null>(null);
   const [report, setReport] = useState<BreachReport | null>(null);
   const [reportSource, setReportSource] = useState<"ai" | "fallback">("fallback");
+  const [jsAudit, setJsAudit] = useState<JsAuditResult | null>(null);
+  const [jsReport, setJsReport] = useState<JsReport | null>(null);
+  const [jsReportSource, setJsReportSource] = useState<"ai" | "fallback">("fallback");
 
   const cleanDomain = domain.trim().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
   const canSubmit = cleanDomain.includes(".");
@@ -55,26 +67,34 @@ export default function BreachDetector() {
       const crawlRes = await crawlDomain(cleanDomain);
       setCrawl(crawlRes);
 
-      // Domain spoofing check (live DNS) and breach lookup are independent — run together.
+      // Domain spoofing (live DNS), breach lookup, and the code audit are all
+      // independent of each other — run them together. The code audit is optional:
+      // if it fails, it shouldn't sink the rest of the report.
       setStep(3);
-      const [domainSecRes, lookupRes] = await Promise.all([
+      const [domainSecRes, lookupRes, auditRes] = await Promise.all([
         checkDomainSecurity(cleanDomain),
         crawlRes.emails.length
           ? lookupBreaches(crawlRes.emails)
           : Promise.resolve({ source: "live" as const, results: [] }),
+        auditJs(cleanDomain).catch(() => null),
       ]);
       setDomainSec(domainSecRes);
       setLookup(lookupRes);
-      setStep(5);
+      setJsAudit(auditRes);
+      setStep(6);
 
-      const { report: rep, source } = await generateReport(
-        crawlRes,
-        lookupRes,
-        orgName.trim() || crawlRes.domain,
-        domainSecRes
-      );
-      setReport(rep);
-      setReportSource(source);
+      // Breach report + code-audit report are separate AI calls — run in parallel.
+      const orgLabel = orgName.trim() || crawlRes.domain;
+      const [breachOut, jsOut] = await Promise.all([
+        generateReport(crawlRes, lookupRes, orgLabel, domainSecRes),
+        auditRes ? generateJsReport(auditRes, orgLabel) : Promise.resolve(null),
+      ]);
+      setReport(breachOut.report);
+      setReportSource(breachOut.source);
+      if (jsOut) {
+        setJsReport(jsOut.report);
+        setJsReportSource(jsOut.source);
+      }
       setPhase("report");
     } catch (e) {
       const msg = (e as Error)?.message || "scan_failed";
@@ -95,6 +115,8 @@ export default function BreachDetector() {
     setLookup(null);
     setDomainSec(null);
     setReport(null);
+    setJsAudit(null);
+    setJsReport(null);
     setStep(0);
   };
 
@@ -103,12 +125,6 @@ export default function BreachDetector() {
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
         <Brand />
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => nav("/code-audit")}
-            className="rounded-full border border-brand-400/40 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20"
-          >
-            {"</>"} Code auditor
-          </button>
           <button
             onClick={() => nav("/phishing")}
             className="rounded-full border border-brand-400/40 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20"
@@ -154,6 +170,9 @@ export default function BreachDetector() {
               domainSec={domainSec}
               report={report}
               reportSource={reportSource}
+              jsAudit={jsAudit}
+              jsReport={jsReport}
+              jsReportSource={jsReportSource}
               onReset={resetAll}
             />
           )}
@@ -207,16 +226,18 @@ function InputView(props: {
           from your website?
         </h1>
         <p className="mt-5 max-w-md text-[15px] leading-relaxed text-muted">
-          Enter your domain. BreachDetector crawls your public pages for staff emails, names and
-          phone numbers — then checks each email against known data breaches and tells you, in plain
-          English, the risks and exactly what to do next.
+          Enter your domain once. Aegis crawls your public pages for staff emails, names and phone
+          numbers, checks them against known breaches, tests whether your domain can be spoofed, and
+          audits the code your site ships — then tells you, in plain English, the risks and exactly
+          what to do next.
         </p>
         <ul className="mt-7 space-y-3 text-sm">
           {[
             "Finds the emails & contact info an attacker would scrape first",
             "Checks each address against known breaches (XposedOrNot)",
             "Tests whether your domain can be spoofed in email (SPF/DMARC/DKIM)",
-            "Turns it into risks, consequences, and a step-by-step plan",
+            "Audits your site's JavaScript for leaked keys, XSS & vulnerable libraries",
+            "Turns it all into risks, consequences, and a step-by-step plan",
           ].map((t) => (
             <li key={t} className="flex items-start gap-3 text-fg/90">
               <span className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full bg-brand-500/20 text-brand-300">
@@ -347,9 +368,12 @@ function ReportView(props: {
   domainSec: DomainSecurity | null;
   report: BreachReport;
   reportSource: "ai" | "fallback";
+  jsAudit: JsAuditResult | null;
+  jsReport: JsReport | null;
+  jsReportSource: "ai" | "fallback";
   onReset: () => void;
 }) {
-  const { orgName, crawl, lookup, domainSec, report, reportSource, onReset } = props;
+  const { orgName, crawl, lookup, domainSec, report, reportSource, jsAudit, jsReport, jsReportSource, onReset } = props;
   const breachedCount = breachedAccounts(lookup);
   const totalB = totalBreaches(lookup);
 
@@ -527,7 +551,159 @@ function ReportView(props: {
           </div>
         )}
       </div>
+
+      {/* website code security (combined JS audit) */}
+      {jsAudit && (
+        <CodeSecuritySection audit={jsAudit} report={jsReport} reportSource={jsReportSource} />
+      )}
     </motion.div>
+  );
+}
+
+function CodeSecuritySection({
+  audit,
+  report,
+  reportSource,
+}: {
+  audit: JsAuditResult;
+  report: JsReport | null;
+  reportSource: "ai" | "fallback";
+}) {
+  const top = worstSeverity(audit);
+  const topMeta = SEVERITY_META[top];
+  const hasFindings = audit.findings.length > 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 pt-2">
+        <h2 className="text-xl font-bold tracking-tight">Website code security</h2>
+        <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
+          {audit.scriptsScanned.length} script{audit.scriptsScanned.length === 1 ? "" : "s"} scanned
+        </span>
+      </div>
+
+      {/* code stat row */}
+      <div className="grid gap-4 sm:grid-cols-4">
+        <Stat label="Security issues" value={audit.counts.security || 0} accent="crit" />
+        <Stat label="Code-quality issues" value={audit.counts.bug || 0} accent="med" />
+        <Stat label="Critical / high" value={(audit.counts.critical || 0) + (audit.counts.high || 0)} accent="high" />
+        <div className="card p-5">
+          <div className="text-xs text-muted">Highest severity</div>
+          <div className="mt-2 text-2xl font-extrabold" style={{ color: topMeta.color }}>
+            {hasFindings ? topMeta.label : "Clean"}
+          </div>
+        </div>
+      </div>
+
+      {/* summary + fix plan */}
+      {report && (
+        <div className="card card-glow p-6">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-bold">Summary & fix plan</h3>
+            {reportSource === "ai" && (
+              <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
+                ✦ AI-assessed
+              </span>
+            )}
+          </div>
+          <p className="mb-5 text-sm leading-relaxed text-fg/85">{report.summary}</p>
+          <div className="space-y-3">
+            {report.recommendations.map((rec, i) => (
+              <details
+                key={i}
+                className="group rounded-xl border border-white/8 bg-white/[0.02] p-4 open:border-brand-400/40"
+                open={i === 0}
+              >
+                <summary className="flex cursor-pointer list-none items-center gap-3">
+                  <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white">
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 font-semibold">{rec.title}</span>
+                  <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-muted">
+                    {rec.effort}
+                  </span>
+                  <span className="text-muted transition group-open:rotate-180">▾</span>
+                </summary>
+                <div className="mt-3 pl-10">
+                  <div className="mb-2 text-xs italic text-brand-300">Why: {rec.why}</div>
+                  <ul className="space-y-1.5">
+                    {rec.steps.map((s, j) => (
+                      <li key={j} className="flex gap-2 text-sm text-fg/85">
+                        <span className="text-brand-400">›</span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
+            ))}
+          </div>
+          {reportSource === "fallback" && (
+            <div className="mt-4 rounded-lg bg-white/[0.03] px-3 py-2 text-[11px] text-muted">
+              Showing the built-in plan — add an <span className="text-fg">ANTHROPIC_API_KEY</span> to
+              generate one tailored to your exact findings.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* findings */}
+      <div className="card p-6">
+        <h3 className="mb-1 text-lg font-bold">What we found in your code</h3>
+        <p className="mb-4 text-sm text-muted">
+          Each item shows the file and line. Items marked{" "}
+          <span className="rounded border border-white/10 px-1 py-0.5 text-[10px]">3rd-party</span> come
+          from widgets/libraries you likely can't edit directly — update or replace them instead.
+        </p>
+        {hasFindings ? (
+          <div className="space-y-2.5">
+            {audit.findings.map((f, i) => (
+              <JsFindingRow key={i} f={f} />
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-lg bg-white/[0.03] px-3 py-3 text-sm text-muted">
+            No bugs or security risks were flagged in the scripts we scanned — nice. Keep your site
+            and its plugins up to date to stay that way.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function JsFindingRow({ f }: { f: JsFinding }) {
+  const m = SEVERITY_META[f.severity];
+  return (
+    <details className="group rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+      <summary className="flex cursor-pointer list-none items-center gap-3">
+        <span
+          className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+          style={{ color: m.color, background: m.bg }}
+        >
+          {m.label}
+        </span>
+        <span className="flex-1 font-semibold">{f.title}</span>
+        <span className="hidden truncate font-mono text-[11px] text-muted sm:block">
+          {f.file}:{f.line}
+        </span>
+        {f.party === 1 && (
+          <span className="flex-none rounded border border-white/10 px-1 py-0.5 text-[10px] text-muted">
+            3rd-party
+          </span>
+        )}
+        <span className="text-muted transition group-open:rotate-180">▾</span>
+      </summary>
+      <div className="mt-3 space-y-2 pl-1">
+        <p className="text-sm text-muted">{f.detail}</p>
+        <div className="text-[11px] text-muted">
+          <span className="font-mono">{f.file}</span> · line {f.line}
+        </div>
+        <pre className="overflow-x-auto rounded-lg bg-ink-900/60 px-3 py-2 font-mono text-[11px] leading-relaxed text-fg/80">
+          {f.snippet}
+        </pre>
+      </div>
+    </details>
   );
 }
 
