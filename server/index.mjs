@@ -396,6 +396,86 @@ app.post("/api/phishing", async (req, res) => {
   }
 });
 
+// Personalized advisor: a grounded chat over the user's actual scan results.
+// Guided plan + free-form follow-ups, tailored to the person's role/comfort/budget.
+function formatScanContext(ctx = {}, profile = {}) {
+  const lines = [];
+  lines.push(`Organization: ${ctx.orgName || ctx.domain || "a small nonprofit"} (domain ${ctx.domain || "unknown"}).`);
+  if (profile.role || profile.comfort || profile.budget) {
+    lines.push(
+      `About the person asking: role = ${profile.role || "unspecified"}; ` +
+        `tech comfort = ${profile.comfort || "unspecified"}; budget = ${profile.budget || "unspecified"}.`
+    );
+  }
+  lines.push("");
+  lines.push("SCAN RESULTS:");
+  lines.push(`- Public emails found: ${ctx.emails ?? 0}; names: ${ctx.names ?? 0}; phones: ${ctx.phones ?? 0}`);
+  if (Array.isArray(ctx.breachedEmails) && ctx.breachedEmails.length) {
+    lines.push(`- Emails in known breaches:`);
+    for (const b of ctx.breachedEmails.slice(0, 12)) {
+      lines.push(`    • ${b.email}: ${b.count} breach(es)${b.breaches?.length ? ` (${b.breaches.slice(0, 5).join(", ")})` : ""}`);
+    }
+  } else {
+    lines.push(`- No emails found in known breaches.`);
+  }
+  if (ctx.domainSecurity) {
+    lines.push(`- Email spoofing (DNS): domain is ${ctx.domainSecurity.spoofable ? "SPOOFABLE" : "reasonably protected"}.` +
+      (ctx.domainSecurity.issues?.length ? ` Issues: ${ctx.domainSecurity.issues.join("; ")}` : ""));
+  }
+  if (ctx.webSecurity) {
+    lines.push(`- Web security headers / TLS: grade ${ctx.webSecurity.grade}.` +
+      (ctx.webSecurity.issues?.length ? ` Issues: ${ctx.webSecurity.issues.join("; ")}` : ""));
+  }
+  if (ctx.reputation) {
+    lines.push(`- Threat-intel reputation: ${ctx.reputation.flagged ? `FLAGGED — ${(ctx.reputation.hits || []).join("; ")}` : "not flagged on the sources checked"}.`);
+  }
+  if (ctx.code) {
+    lines.push(`- Website code audit: ${ctx.code.security || 0} security + ${ctx.code.bug || 0} quality findings.` +
+      (ctx.code.top?.length ? ` Top: ${ctx.code.top.slice(0, 6).join("; ")}` : ""));
+  }
+  if (Array.isArray(ctx.topRisks) && ctx.topRisks.length) {
+    lines.push(`- Assessed top risks: ${ctx.topRisks.slice(0, 6).join("; ")}`);
+  }
+  return lines.join("\n");
+}
+
+app.post("/api/advisor", async (req, res) => {
+  if (!client) return res.status(503).json({ error: "no_api_key" });
+  const { context, profile, messages } = req.body ?? {};
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: "messages_required" });
+  }
+  try {
+    const convo = messages
+      .slice(-12)
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+    if (convo.length === 0 || convo[0].role !== "user") {
+      return res.status(400).json({ error: "messages_required" });
+    }
+    const result = await client.messages.create({
+      model: MODEL,
+      max_tokens: 2000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low" },
+      system:
+        "You are Aegis, a calm, encouraging cybersecurity advisor for a small nonprofit that has no IT staff. " +
+        "You are given the real results of a security scan of their website plus some context about the person asking. " +
+        "Give specific, prioritized, plain-language advice tailored to THEIR actual findings and THEIR situation " +
+        "(role, tech comfort, budget). Always ground answers in the scan results below — reference the specific findings. " +
+        "When they ask how to do something, give short numbered steps. Recommend free/low-cost tools when budget is tight. " +
+        "Be concise and concrete; no jargon, no blame, never invent findings that aren't in the results.\n\n" +
+        formatScanContext(context, profile),
+      messages: convo,
+    });
+    const reply = result.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    res.json({ reply });
+  } catch (err) {
+    console.error("advisor error:", err?.message || err);
+    res.status(502).json({ error: "ai_error" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(
     `[aegis-api] listening on http://localhost:${PORT}  ` +

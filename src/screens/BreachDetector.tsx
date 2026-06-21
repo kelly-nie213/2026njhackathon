@@ -27,6 +27,7 @@ import {
   type JsReport,
   type JsFinding,
 } from "../lib/jsaudit";
+import { askAdvisor, type AdvisorProfile, type ChatMessage } from "../lib/api";
 
 type Phase = "input" | "scanning" | "report";
 
@@ -405,7 +406,7 @@ function ScanningView({ step, domain }: { step: number; domain: string }) {
    REPORT VIEW — tabbed
 ────────────────────────────────────────────── */
 
-type ReportTab = "found" | "risks" | "action";
+type ReportTab = "found" | "risks" | "action" | "advisor";
 
 const DEMOGRAPHICS = [
   { id: "all",        label: "Everyone",        color: "#0a84ff" },
@@ -475,6 +476,7 @@ const REPORT_TABS: { id: ReportTab; label: string }[] = [
   { id: "found",  label: "What We Found" },
   { id: "risks",  label: "Risks & Who's at Risk" },
   { id: "action", label: "Step-by-Step Action" },
+  { id: "advisor", label: "Ask Aegis" },
 ];
 
 function ReportView(props: {
@@ -496,6 +498,31 @@ function ReportView(props: {
   const totalB = totalBreaches(lookup);
   const [reportTab, setReportTab] = useState<ReportTab>("found");
   const [demoId, setDemoId] = useState<DemoId>("all");
+
+  // Compact, real summary of everything we found — fed to the personalized advisor.
+  const scanContext = {
+    orgName,
+    domain: crawl.domain,
+    emails: crawl.emails.length,
+    names: crawl.names.length,
+    phones: crawl.phones.length,
+    breachedEmails: lookup.results
+      .filter((r) => r.status === "breached")
+      .map((r) => ({ email: r.email, count: r.breachCount, breaches: r.breaches.map((b) => b.title) })),
+    domainSecurity: domainSec
+      ? { spoofable: domainSec.spoofable, issues: domainSec.checks.filter((c) => c.status !== "pass").map((c) => c.title) }
+      : null,
+    webSecurity: webSec
+      ? { grade: webSec.grade, issues: webSec.checks.filter((c) => c.status !== "pass").map((c) => c.title) }
+      : null,
+    reputation: reputation
+      ? { flagged: reputation.flagged, hits: reputation.checks.filter((c) => c.status === "fail").map((c) => c.title) }
+      : null,
+    code: jsAudit
+      ? { security: jsAudit.counts.security || 0, bug: jsAudit.counts.bug || 0, top: jsAudit.findings.slice(0, 6).map((f) => f.title) }
+      : null,
+    topRisks: report.risks.map((r) => r.title),
+  };
 
   // When the tab changes, bring the tab bar (and the panel right under it) into
   // view so the switch is always visible, even from far down a long panel.
@@ -825,8 +852,164 @@ function ReportView(props: {
             </div>
           </motion.div>
         )}
+
+        {/* ─ Ask Aegis (personalized advisor) ─ */}
+        {reportTab === "advisor" && (
+          <motion.div
+            key="advisor"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Advisor context={scanContext} orgName={orgName} />
+          </motion.div>
+        )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   ADVISOR — guided profile + grounded follow-up chat
+────────────────────────────────────────────── */
+
+const ROLE_OPTS = ["Volunteer", "Staff member", "IT / tech lead", "Leadership / ED", "Board member", "Other"];
+const COMFORT_OPTS = ["Not techy", "Some experience", "Comfortable with tech"];
+const BUDGET_OPTS = ["$0 — free tools only", "Small budget", "We have a budget"];
+
+function Advisor({ context, orgName }: { context: Record<string, unknown>; orgName: string }) {
+  const [profile, setProfile] = useState<AdvisorProfile>({ role: ROLE_OPTS[0], comfort: COMFORT_OPTS[0], budget: BUDGET_OPTS[0] });
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [noKey, setNoKey] = useState(false);
+  const threadRef = useRef<HTMLDivElement>(null);
+
+  const send = async (next: ChatMessage[]) => {
+    setLoading(true);
+    setMessages(next);
+    setTimeout(() => threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" }), 50);
+    const res = await askAdvisor(context, profile, next);
+    if (res.ok) {
+      setMessages([...next, { role: "assistant", content: res.reply }]);
+    } else if (res.error === "no_key") {
+      setNoKey(true);
+    } else {
+      setMessages([...next, { role: "assistant", content: "Sorry — I couldn't reach the advisor just now. Please try again in a moment." }]);
+    }
+    setLoading(false);
+    setTimeout(() => threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" }), 80);
+  };
+
+  const start = () => {
+    setStarted(true);
+    send([{ role: "user", content: "Based on my scan results, give me a short prioritized plan of what to do, tailored to me. Start with what matters most." }]);
+  };
+
+  const ask = () => {
+    const q = input.trim();
+    if (!q || loading) return;
+    setInput("");
+    send([...messages, { role: "user", content: q }]);
+  };
+
+  if (noKey) {
+    return (
+      <div className="card p-6">
+        <h2 className="text-lg font-bold">Ask Aegis</h2>
+        <p className="mt-2 text-sm text-muted">
+          The personalized advisor needs a Claude API key. Add an{" "}
+          <span className="text-fg">ANTHROPIC_API_KEY</span> to the server's <span className="text-fg">.env</span> and
+          restart — then you can get advice tailored to your exact results. The rest of this report works without it.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-6">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-bold">Ask Aegis</h2>
+        <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
+          personalized to your results
+        </span>
+      </div>
+      <p className="mb-5 text-sm text-muted">
+        Tell us a little about you and get a plan tailored to {orgName}'s findings — then ask anything.
+      </p>
+
+      {/* Guided profile */}
+      {!started && (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <ProfileSelect label="Your role" value={profile.role} opts={ROLE_OPTS}
+              onChange={(v) => setProfile((p) => ({ ...p, role: v }))} />
+            <ProfileSelect label="Tech comfort" value={profile.comfort} opts={COMFORT_OPTS}
+              onChange={(v) => setProfile((p) => ({ ...p, comfort: v }))} />
+            <ProfileSelect label="Budget" value={profile.budget} opts={BUDGET_OPTS}
+              onChange={(v) => setProfile((p) => ({ ...p, budget: v }))} />
+          </div>
+          <button onClick={start} disabled={loading} className="p-btn p-prim-col" style={{ margin: 0 }}>
+            {loading ? "Thinking…" : "Get my personalized plan"}
+          </button>
+        </div>
+      )}
+
+      {/* Conversation */}
+      {started && (
+        <>
+          <div ref={threadRef} className="max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className="max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
+                  style={
+                    m.role === "user"
+                      ? { background: "#0a84ff", color: "#fff" }
+                      : { background: "rgba(255,255,255,0.06)", color: "var(--color-fg)" }
+                  }
+                >
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl bg-white/[0.06] px-4 py-2.5 text-sm text-muted">Thinking…</div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 flex items-end gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && ask()}
+              placeholder="Ask a follow-up — e.g. how do I turn on DMARC?"
+              className="p-form-text"
+              style={{ width: "100%" }}
+              disabled={loading}
+            />
+            <button onClick={ask} disabled={loading || !input.trim()} className="p-btn p-prim-col" style={{ margin: 0 }}>
+              Ask
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ProfileSelect({ label, value, opts, onChange }: { label: string; value: string; opts: string[]; onChange: (v: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-medium uppercase tracking-[0.06em] text-white/40">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="p-form-select" style={{ width: "100%" }}>
+        {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
   );
 }
 

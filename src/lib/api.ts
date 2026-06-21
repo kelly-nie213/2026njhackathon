@@ -1,5 +1,44 @@
 import type { TriageResult } from "./triage";
 
+/* ---------- Personalized advisor (grounded chat over scan results) ---------- */
+
+export interface AdvisorProfile {
+  role: string;
+  comfort: string;
+  budget: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export type AdvisorResult =
+  | { ok: true; reply: string }
+  | { ok: false; error: "no_key" | "ai_error" | "network" };
+
+/** Ask the AI advisor a question, grounded in the scan context + the user's profile. */
+export async function askAdvisor(
+  context: Record<string, unknown>,
+  profile: AdvisorProfile,
+  messages: ChatMessage[]
+): Promise<AdvisorResult> {
+  try {
+    const res = await fetch("/api/advisor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context, profile, messages }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, reply: data.reply };
+    }
+    return { ok: false, error: res.status === 503 ? "no_key" : "ai_error" };
+  } catch {
+    return { ok: false, error: "network" };
+  }
+}
+
 export interface PhishingVerdict {
   verdict: "likely_phishing" | "suspicious" | "likely_safe";
   confidence: number;
