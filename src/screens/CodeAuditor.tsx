@@ -3,29 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brand } from "../components/Brand";
 import {
-  crawlDomain,
-  lookupBreaches,
-  generateReport,
-  breachedAccounts,
-  totalBreaches,
+  auditJs,
+  generateJsReport,
+  worstSeverity,
   SEVERITY_META,
-  type CrawlResult,
-  type BreachLookup,
-  type BreachReport,
-  type EmailBreach,
-} from "../lib/breach";
+  type JsAuditResult,
+  type JsReport,
+  type JsFinding,
+} from "../lib/jsaudit";
 
 type Phase = "input" | "scanning" | "report";
 
 const SCAN_STEPS = [
   "Reaching the website…",
-  "Crawling public pages for contact info…",
-  "Extracting emails, names & phone numbers…",
-  "Checking each email against breach databases…",
-  "Assessing risks and writing your action plan…",
+  "Finding the JavaScript it loads…",
+  "Downloading external & inline scripts…",
+  "Scanning code for bugs & security risks…",
+  "Writing your plain-language fix plan…",
 ];
 
-export default function BreachDetector() {
+export default function CodeAuditor() {
   const nav = useNavigate();
   const [phase, setPhase] = useState<Phase>("input");
   const [domain, setDomain] = useState("");
@@ -33,9 +30,8 @@ export default function BreachDetector() {
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const [crawl, setCrawl] = useState<CrawlResult | null>(null);
-  const [lookup, setLookup] = useState<BreachLookup | null>(null);
-  const [report, setReport] = useState<BreachReport | null>(null);
+  const [audit, setAudit] = useState<JsAuditResult | null>(null);
+  const [report, setReport] = useState<JsReport | null>(null);
   const [reportSource, setReportSource] = useState<"ai" | "fallback">("fallback");
 
   const cleanDomain = domain.trim().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
@@ -47,21 +43,14 @@ export default function BreachDetector() {
     setPhase("scanning");
     setStep(0);
     try {
-      setStep(1);
-      const crawlRes = await crawlDomain(cleanDomain);
-      setCrawl(crawlRes);
-      setStep(3);
-
-      const lookupRes = crawlRes.emails.length
-        ? await lookupBreaches(crawlRes.emails)
-        : { source: "demo" as const, results: [] };
-      setLookup(lookupRes);
+      setStep(2);
+      const auditRes = await auditJs(cleanDomain);
+      setAudit(auditRes);
       setStep(4);
 
-      const { report: rep, source } = await generateReport(
-        crawlRes,
-        lookupRes,
-        orgName.trim() || crawlRes.domain
+      const { report: rep, source } = await generateJsReport(
+        auditRes,
+        orgName.trim() || auditRes.domain
       );
       setReport(rep);
       setReportSource(source);
@@ -81,34 +70,21 @@ export default function BreachDetector() {
 
   const resetAll = () => {
     setPhase("input");
-    setCrawl(null);
-    setLookup(null);
+    setAudit(null);
     setReport(null);
     setStep(0);
   };
 
   return (
     <div className="bg-aurora min-h-full pb-16">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <Brand />
-        <div className="flex items-center gap-2">
+      <header className="border-b border-white/8">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          <Brand />
           <button
-            onClick={() => nav("/code-audit")}
-            className="rounded-full border border-brand-400/40 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20"
+            onClick={() => nav("/")}
+            className="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-fg"
           >
-            {"</>"} Code auditor
-          </button>
-          <button
-            onClick={() => nav("/phishing")}
-            className="rounded-full border border-brand-400/40 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200 transition hover:bg-brand-500/20"
-          >
-            ✉️ Phishing checker
-          </button>
-          <button
-            onClick={() => nav("/triage")}
-            className="rounded-full border border-risk-high/40 bg-risk-crit/10 px-3 py-1 text-xs font-medium text-risk-high transition hover:bg-risk-crit/20"
-          >
-            ⚑ Something already happened?
+            ← Back
           </button>
         </div>
       </header>
@@ -134,12 +110,11 @@ export default function BreachDetector() {
 
           {phase === "scanning" && <ScanningView key="scanning" step={step} domain={cleanDomain} />}
 
-          {phase === "report" && crawl && lookup && report && (
+          {phase === "report" && audit && report && (
             <ReportView
               key="report"
-              orgName={orgName.trim() || crawl.domain}
-              crawl={crawl}
-              lookup={lookup}
+              orgName={orgName.trim() || audit.domain}
+              audit={audit}
               report={report}
               reportSource={reportSource}
               onReset={resetAll}
@@ -180,30 +155,31 @@ function InputView(props: {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="grid items-center gap-10 pt-6 lg:grid-cols-2"
+      className="grid items-center gap-10 pt-8 lg:grid-cols-2"
     >
       <div>
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-risk-high/30 bg-risk-crit/10 px-3 py-1 text-xs font-medium text-risk-high">
-          <span className="h-1.5 w-1.5 rounded-full bg-risk-high" />
-          See your nonprofit through an attacker's eyes
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+          Static analysis of your live site's code
         </div>
         <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl">
-          What can a stranger{" "}
-          <span className="bg-gradient-to-r from-risk-high to-accent-400 bg-clip-text text-transparent">
-            harvest
+          Is there a{" "}
+          <span className="bg-gradient-to-r from-brand-300 to-accent-400 bg-clip-text text-transparent">
+            bug or security hole
           </span>{" "}
-          from your website?
+          in your website's code?
         </h1>
         <p className="mt-5 max-w-md text-[15px] leading-relaxed text-muted">
-          Enter your domain. BreachDetector crawls your public pages for staff emails, names and
-          phone numbers — then checks each email against known data breaches and tells you, in plain
-          English, the risks and exactly what to do next.
+          Enter your domain. The Code Auditor reads the JavaScript your site actually ships to
+          visitors and scans it for leaked keys, cross-site-scripting holes, insecure requests,
+          outdated libraries and leftover debug code — then explains, in plain English, which ones
+          matter and how to fix them.
         </p>
         <ul className="mt-7 space-y-3 text-sm">
           {[
-            "Finds the emails & contact info an attacker would scrape first",
-            "Checks each address against known breaches (XposedOrNot)",
-            "Turns it into risks, consequences, and a step-by-step plan",
+            "Finds hardcoded API keys, tokens & passwords in your code",
+            "Flags XSS sinks, insecure http:// calls & known-vulnerable libraries",
+            "Turns it into a prioritized, jargon-free fix plan",
           ].map((t) => (
             <li key={t} className="flex items-start gap-3 text-fg/90">
               <span className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full bg-brand-500/20 text-brand-300">
@@ -216,8 +192,8 @@ function InputView(props: {
       </div>
 
       <div className="card card-glow p-7">
-        <h2 className="text-xl font-semibold">Your project portal</h2>
-        <p className="mt-1 text-sm text-muted">We only read public pages. Nothing is stored.</p>
+        <h2 className="text-xl font-semibold">Scan your site's code</h2>
+        <p className="mt-1 text-sm text-muted">We only read public scripts. Nothing is executed or stored.</p>
 
         <div className="mt-6 space-y-4">
           <label className="block">
@@ -256,7 +232,7 @@ function InputView(props: {
           disabled={!canSubmit}
           className="mt-6 w-full rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 py-3 font-semibold text-white shadow-lg shadow-brand-600/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Run breach scan →
+          Audit my code →
         </button>
         <button
           onClick={onExample}
@@ -294,12 +270,12 @@ function ScanningView({ step, domain }: { step: number; domain: string }) {
             animate={{ rotate: [0, 6, -6, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            🔍
+            {"</>"}
           </motion.div>
         </div>
       </div>
       <p className="text-sm text-muted">
-        Scanning <span className="font-semibold text-fg">{domain}</span>
+        Auditing <span className="font-semibold text-fg">{domain}</span>
       </p>
       <div className="mt-5 h-8">
         <AnimatePresence mode="wait">
@@ -329,29 +305,29 @@ function ScanningView({ step, domain }: { step: number; domain: string }) {
 
 function ReportView(props: {
   orgName: string;
-  crawl: CrawlResult;
-  lookup: BreachLookup;
-  report: BreachReport;
+  audit: JsAuditResult;
+  report: JsReport;
   reportSource: "ai" | "fallback";
   onReset: () => void;
 }) {
-  const { orgName, crawl, lookup, report, reportSource, onReset } = props;
-  const breachedCount = breachedAccounts(lookup);
-  const totalB = totalBreaches(lookup);
+  const { orgName, audit, report, reportSource, onReset } = props;
+  const top = worstSeverity(audit);
+  const topMeta = SEVERITY_META[top];
+  const hasFindings = audit.findings.length > 0;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className="space-y-6 pt-2"
+      className="space-y-6 pt-6"
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Breach exposure report</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Code security audit</h1>
           <p className="mt-1 text-sm text-muted">
-            {orgName} · <span className="font-mono text-brand-300">{crawl.domain}</span> ·{" "}
-            {crawl.pagesScanned.length} page{crawl.pagesScanned.length === 1 ? "" : "s"} scanned
+            {orgName} · <span className="font-mono text-brand-300">{audit.domain}</span> ·{" "}
+            {audit.scriptsScanned.length} script{audit.scriptsScanned.length === 1 ? "" : "s"} scanned
           </p>
         </div>
         <button
@@ -362,119 +338,32 @@ function ReportView(props: {
         </button>
       </div>
 
-      {lookup.source === "demo" && crawl.emails.length > 0 && (
-        <div className="rounded-lg border border-risk-med/30 bg-risk-med/10 px-3 py-2 text-xs text-risk-med">
-          ⚠ Couldn't reach the breach database, so results below are{" "}
-          <span className="font-semibold">simulated</span>. Check your connection and rescan for live
-          data.
-        </div>
-      )}
-
       {/* stat row */}
       <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="Public emails found" value={crawl.emails.length} accent="high" />
-        <Stat label="Emails in breaches" value={breachedCount} accent="crit" />
-        <Stat label="Total breach hits" value={totalB} accent="crit" />
-        <Stat label="Names & phones exposed" value={crawl.names.length + crawl.phones.length} accent="med" />
+        <Stat label="Security issues" value={audit.counts.security || 0} accent="crit" />
+        <Stat label="Code-quality issues" value={audit.counts.bug || 0} accent="med" />
+        <Stat label="Critical / high" value={(audit.counts.critical || 0) + (audit.counts.high || 0)} accent="high" />
+        <div className="card p-5">
+          <div className="text-xs text-muted">Highest severity</div>
+          <div className="mt-2 text-2xl font-extrabold" style={{ color: topMeta.color }}>
+            {hasFindings ? topMeta.label : "Clean"}
+          </div>
+        </div>
       </div>
 
-      {/* what we harvested */}
-      <div className="card p-6">
-        <h2 className="mb-1 text-lg font-bold">What we harvested from your site</h2>
-        <p className="mb-4 text-sm text-muted">
-          This is public data an attacker could scrape in seconds. Each email is checked below.
-        </p>
-
-        {lookup.results.length > 0 ? (
-          <div className="space-y-2.5">
-            {lookup.results
-              .slice()
-              .sort((a, b) => b.breachCount - a.breachCount)
-              .map((r) => (
-                <EmailRow key={r.email} r={r} />
-              ))}
-          </div>
-        ) : (
-          <p className="rounded-lg bg-white/[0.03] px-3 py-3 text-sm text-muted">
-            No public email addresses were found on the pages we scanned — that's good for your
-            attack surface.
-          </p>
-        )}
-
-        {(crawl.names.length > 0 || crawl.phones.length > 0) && (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            {crawl.names.length > 0 && (
-              <Chips title="Names found" items={crawl.names} icon="👤" />
-            )}
-            {crawl.phones.length > 0 && (
-              <Chips title="Phone numbers found" items={crawl.phones} icon="📞" />
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* risks */}
-      <div className="card p-6">
-        <div className="mb-1 flex items-center gap-2">
-          <h2 className="text-lg font-bold">Potential risks & who's at risk</h2>
+      {/* AI / fallback summary + recommendations */}
+      <div className="card card-glow p-6">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-bold">Summary & fix plan</h2>
           {reportSource === "ai" && (
             <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
               ✦ AI-assessed
             </span>
           )}
         </div>
-        <p className="mb-4 text-sm leading-relaxed text-fg/85">{report.summary}</p>
+        <p className="mb-5 text-sm leading-relaxed text-fg/85">{report.summary}</p>
         <div className="space-y-3">
-          {report.risks.map((risk, i) => {
-            const m = SEVERITY_META[risk.severity];
-            return (
-              <div key={i} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="font-semibold">{risk.title}</div>
-                  <span
-                    className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                    style={{ color: m.color, background: m.bg }}
-                  >
-                    {m.label}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-sm text-muted">{risk.consequence}</p>
-                {risk.whoAtRisk.length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-[11px] font-medium uppercase tracking-wide text-risk-high">
-                      Who's at risk
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {risk.whoAtRisk.map((w) => (
-                        <span
-                          key={w}
-                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px]"
-                        >
-                          {w}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* action plan */}
-      <div className="card card-glow p-6">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-bold">Your step-by-step action plan</h2>
-          <span className="rounded-full bg-risk-low/15 px-2 py-0.5 text-[11px] font-medium text-risk-low">
-            start at the top
-          </span>
-        </div>
-        <p className="mb-5 text-sm text-muted">
-          Plain English, in priority order. The first two steps stop most attacks on their own.
-        </p>
-        <div className="space-y-3">
-          {report.actions.map((step, i) => (
+          {report.recommendations.map((rec, i) => (
             <details
               key={i}
               className="group rounded-xl border border-white/8 bg-white/[0.02] p-4 open:border-brand-400/40"
@@ -484,16 +373,16 @@ function ReportView(props: {
                 <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white">
                   {i + 1}
                 </span>
-                <span className="flex-1 font-semibold">{step.title}</span>
+                <span className="flex-1 font-semibold">{rec.title}</span>
                 <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-muted">
-                  {step.effort}
+                  {rec.effort}
                 </span>
                 <span className="text-muted transition group-open:rotate-180">▾</span>
               </summary>
               <div className="mt-3 pl-10">
-                <div className="mb-2 text-xs italic text-brand-300">Why: {step.why}</div>
+                <div className="mb-2 text-xs italic text-brand-300">Why: {rec.why}</div>
                 <ul className="space-y-1.5">
-                  {step.steps.map((s, j) => (
+                  {rec.steps.map((s, j) => (
                     <li key={j} className="flex gap-2 text-sm text-fg/85">
                       <span className="text-brand-400">›</span>
                       {s}
@@ -511,71 +400,88 @@ function ReportView(props: {
           </div>
         )}
       </div>
+
+      {/* findings list */}
+      <div className="card p-6">
+        <h2 className="mb-1 text-lg font-bold">What we found in your code</h2>
+        <p className="mb-4 text-sm text-muted">
+          Each item shows the file and line. Items marked{" "}
+          <span className="rounded border border-white/10 px-1 py-0.5 text-[10px]">3rd-party</span> come
+          from widgets/libraries you likely can't edit directly — update or replace them instead.
+        </p>
+
+        {hasFindings ? (
+          <div className="space-y-2.5">
+            {audit.findings.map((f, i) => (
+              <FindingRow key={i} f={f} />
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-lg bg-white/[0.03] px-3 py-3 text-sm text-muted">
+            No bugs or security risks were flagged in the scripts we scanned — nice. Keep your site
+            and its plugins up to date to stay that way.
+          </p>
+        )}
+      </div>
+
+      {/* scripts scanned */}
+      <div className="card p-6">
+        <h2 className="mb-3 text-lg font-bold">
+          Scripts scanned ({audit.scriptsScanned.length}
+          {audit.externalFound > audit.scriptsScanned.length
+            ? ` of ${audit.externalFound} found`
+            : ""}
+          )
+        </h2>
+        <div className="flex flex-wrap gap-1.5">
+          {audit.scriptsScanned.map((s) => (
+            <span
+              key={s.url + s.file}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[11px]"
+              title={s.url}
+            >
+              {s.party === 0 ? "🏠" : "🌐"} {s.file}
+              <span className="text-muted">{(s.bytes / 1024).toFixed(0)}kb</span>
+            </span>
+          ))}
+        </div>
+      </div>
     </motion.div>
   );
 }
 
-function EmailRow({ r }: { r: EmailBreach }) {
-  const breached = r.status === "breached";
-  const err = r.status === "error";
+function FindingRow({ f }: { f: JsFinding }) {
+  const m = SEVERITY_META[f.severity];
   return (
     <details className="group rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
       <summary className="flex cursor-pointer list-none items-center gap-3">
-        <span className="text-base">{breached ? "🔴" : err ? "⚪" : "🟢"}</span>
-        <span className="flex-1 truncate font-mono text-sm">{r.email}</span>
         <span
           className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-          style={{
-            color: breached ? "var(--color-risk-crit)" : err ? "var(--color-muted)" : "var(--color-risk-low)",
-            background: breached ? "rgba(244,63,94,0.14)" : err ? "rgba(255,255,255,0.05)" : "rgba(52,211,153,0.12)",
-          }}
+          style={{ color: m.color, background: m.bg }}
         >
-          {breached ? `${r.breachCount} breach${r.breachCount === 1 ? "" : "es"}` : err ? "lookup failed" : "no breaches"}
+          {m.label}
         </span>
-        {breached && <span className="text-muted transition group-open:rotate-180">▾</span>}
-      </summary>
-      {breached && (
-        <div className="mt-3 space-y-2 pl-9">
-          {r.breaches.map((b, i) => (
-            <div key={i} className="rounded-lg bg-ink-900/60 px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold">{b.title}</span>
-                <span className="text-[11px] text-muted">{b.breachDate?.slice(0, 4)}</span>
-              </div>
-              {b.dataClasses.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {b.dataClasses.slice(0, 6).map((c) => (
-                    <span
-                      key={c}
-                      className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-muted"
-                    >
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </details>
-  );
-}
-
-function Chips({ title, items, icon }: { title: string; items: string[]; icon: string }) {
-  return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
-      <div className="mb-2 text-xs font-medium text-muted">
-        {icon} {title} ({items.length})
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map((it) => (
-          <span key={it} className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-xs">
-            {it}
+        <span className="flex-1 font-semibold">{f.title}</span>
+        <span className="hidden truncate font-mono text-[11px] text-muted sm:block">
+          {f.file}:{f.line}
+        </span>
+        {f.party === 1 && (
+          <span className="flex-none rounded border border-white/10 px-1 py-0.5 text-[10px] text-muted">
+            3rd-party
           </span>
-        ))}
+        )}
+        <span className="text-muted transition group-open:rotate-180">▾</span>
+      </summary>
+      <div className="mt-3 space-y-2 pl-1">
+        <p className="text-sm text-muted">{f.detail}</p>
+        <div className="text-[11px] text-muted">
+          <span className="font-mono">{f.file}</span> · line {f.line}
+        </div>
+        <pre className="overflow-x-auto rounded-lg bg-ink-900/60 px-3 py-2 font-mono text-[11px] leading-relaxed text-fg/80">
+          {f.snippet}
+        </pre>
       </div>
-    </div>
+    </details>
   );
 }
 
