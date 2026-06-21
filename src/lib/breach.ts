@@ -26,11 +26,10 @@ export interface EmailBreach {
   breachCount: number;
   breaches: BreachInfo[];
   error?: string;
-  simulated?: boolean;
 }
 
 export interface BreachLookup {
-  source: "live" | "demo";
+  source: "live" | "error";
   results: EmailBreach[];
 }
 

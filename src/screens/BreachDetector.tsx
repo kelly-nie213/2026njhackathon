@@ -61,7 +61,7 @@ export default function BreachDetector() {
         checkDomainSecurity(cleanDomain),
         crawlRes.emails.length
           ? lookupBreaches(crawlRes.emails)
-          : Promise.resolve({ source: "demo" as const, results: [] }),
+          : Promise.resolve({ source: "live" as const, results: [] }),
       ]);
       setDomainSec(domainSecRes);
       setLookup(lookupRes);
@@ -376,11 +376,10 @@ function ReportView(props: {
         </button>
       </div>
 
-      {lookup.source === "demo" && crawl.emails.length > 0 && (
+      {lookup.source === "error" && crawl.emails.length > 0 && (
         <div className="rounded-lg border border-risk-med/30 bg-risk-med/10 px-3 py-2 text-xs text-risk-med">
-          ⚠ Couldn't reach the breach database, so results below are{" "}
-          <span className="font-semibold">simulated</span>. Check your connection and rescan for live
-          data.
+          ⚠ We couldn't reach the breach database, so the emails below{" "}
+          <span className="font-semibold">weren't checked</span>. Check your connection and rescan.
         </div>
       )}
 
