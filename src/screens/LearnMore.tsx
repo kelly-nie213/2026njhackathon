@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Nav } from "../components/Nav";
@@ -8,10 +8,10 @@ import { Nav } from "../components/Nav";
 ════════════════════════════════════════ */
 
 const STATS = [
-  { value: "68%",   label: "of nonprofits experienced a cyberattack or breach" },
-  { value: "$1.54M", label: "average ransomware payment in 2023" },
-  { value: "277",   label: "days average time to detect a breach" },
-  { value: "88%",   label: "of all breaches start with human error" },
+  { num: 68,   decimals: 0, prefix: "",  suffix: "%",  label: "of nonprofits experienced a cyberattack or breach" },
+  { num: 1.54, decimals: 2, prefix: "$", suffix: "M",  label: "average ransomware payment in 2023" },
+  { num: 277,  decimals: 0, prefix: "",  suffix: "",   label: "days average time to detect a breach" },
+  { num: 88,   decimals: 0, prefix: "",  suffix: "%",  label: "of all breaches start with human error" },
 ];
 
 type Severity = "critical" | "high" | "medium";
@@ -153,26 +153,178 @@ const PILLARS: Pillar[] = [
 ];
 
 const PERSONAL_TIPS = [
-  { tip: "Use a password manager", detail: "Bitwarden (free) or 1Password — never reuse a password" },
-  { tip: "Enable MFA on everything", detail: "Start with email, then banking, then everything else" },
-  { tip: "Update immediately", detail: "When your phone or computer says 'update available', do it today, not next week" },
-  { tip: "Pause before you click", detail: "Urgency + unusual request = almost certainly a scam. Call to verify." },
-  { tip: "Use a VPN on public Wi-Fi", detail: "Coffee shops, airports, hotels — always use a VPN (Mullvad, ProtonVPN)" },
-  { tip: "Back up your personal data", detail: "Photos, documents — use an external drive AND cloud backup" },
-  { tip: "Lock your screens", detail: "Auto-lock after 2 minutes on all devices, every time, everywhere" },
-  { tip: "Check your accounts", detail: "Review bank and credit card statements weekly — catch fraud fast" },
-];
+  { tip: "Use a password manager", detail: "Bitwarden (free) or 1Password — never reuse a password", icon: "key" },
+  { tip: "Enable MFA on everything", detail: "Start with email, then banking, then everything else", icon: "shield" },
+  { tip: "Update immediately", detail: "When your phone or computer says 'update available', do it today, not next week", icon: "refresh" },
+  { tip: "Pause before you click", detail: "Urgency + unusual request = almost certainly a scam. Call to verify.", icon: "cursor" },
+  { tip: "Use a VPN on public Wi-Fi", detail: "Coffee shops, airports, hotels — always use a VPN (Mullvad, ProtonVPN)", icon: "wifi" },
+  { tip: "Back up your personal data", detail: "Photos, documents — use an external drive AND cloud backup", icon: "cloud" },
+  { tip: "Lock your screens", detail: "Auto-lock after 2 minutes on all devices, every time, everywhere", icon: "lock" },
+  { tip: "Check your accounts", detail: "Review bank and credit card statements weekly — catch fraud fast", icon: "eye" },
+] as const;
 
 const ORG_TIPS = [
-  { tip: "Write an offboarding checklist", detail: "Revoke all access the day someone leaves — email, CRM, Slack, everything" },
-  { tip: "Map your data", detail: "Know where donor PII lives: which databases, cloud drives, spreadsheets" },
-  { tip: "Upgrade to Microsoft 365 or Google Workspace", detail: "Built-in email filtering, MFA, device management — worth every dollar" },
-  { tip: "Write a one-page incident response plan", detail: "Who to call, what to do first, who has authority to act — before you need it" },
-  { tip: "Cyber insurance", detail: "Many nonprofits qualify for affordable policies that cover breach response costs" },
-  { tip: "Quarterly security check-in", detail: "30-minute team meeting: review recent phishing examples and remind of procedures" },
-  { tip: "Enforce MFA org-wide", detail: "Require it in your Google/Microsoft admin console — not optional" },
-  { tip: "Test your backups", detail: "Quarterly fire drill: restore a file from backup to prove it actually works" },
+  { tip: "Write an offboarding checklist", detail: "Revoke all access the day someone leaves — email, CRM, Slack, everything", icon: "list" },
+  { tip: "Map your data", detail: "Know where donor PII lives: which databases, cloud drives, spreadsheets", icon: "map" },
+  { tip: "Upgrade to Microsoft 365 or Google Workspace", detail: "Built-in email filtering, MFA, device management — worth every dollar", icon: "building" },
+  { tip: "Write a one-page incident response plan", detail: "Who to call, what to do first, who has authority to act — before you need it", icon: "doc" },
+  { tip: "Get cyber insurance", detail: "Many nonprofits qualify for affordable policies that cover breach response costs", icon: "shield" },
+  { tip: "Quarterly security check-in", detail: "30-minute team meeting: review recent phishing examples and remind of procedures", icon: "calendar" },
+  { tip: "Enforce MFA org-wide", detail: "Require it in your Google/Microsoft admin console — not optional", icon: "key" },
+  { tip: "Test your backups", detail: "Quarterly fire drill: restore a file from backup to prove it actually works", icon: "refresh" },
+] as const;
+
+/* ════════════════════════════════════════
+   QUIZ DATA
+════════════════════════════════════════ */
+
+interface QuizQ {
+  id: number;
+  scenario: string;
+  pillarId: number;
+  options: { label: string; text: string }[];
+  correct: string;
+  explanation: string;
+}
+
+const QUIZ: QuizQ[] = [
+  {
+    id: 1,
+    scenario: "Your ED sends an email from their real address asking you to urgently wire $3,500 to a new vendor. What do you do?",
+    pillarId: 7,
+    options: [
+      { label: "A", text: "Wire the money — it's from their real address" },
+      { label: "B", text: "Reply to the email asking for written confirmation" },
+      { label: "C", text: "Call the ED on their personal number to verify before doing anything" },
+      { label: "D", text: "Google the vendor to check if they exist, then send" },
+    ],
+    correct: "C",
+    explanation: "Email can be hacked or spoofed. Always verify financial requests by phone on a number you already have — never one from the email. This is Business Email Compromise (BEC), the #1 nonprofit fraud.",
+  },
+  {
+    id: 2,
+    scenario: "You're onboarding five new volunteers who need access to your donor CRM. What's the safest approach?",
+    pillarId: 1,
+    options: [
+      { label: "A", text: "Create one shared login everyone uses — simpler to manage" },
+      { label: "B", text: "Each volunteer gets their own login with MFA enabled" },
+      { label: "C", text: "Email each volunteer the password so they have it handy" },
+      { label: "D", text: "Use the same password as your main email for convenience" },
+    ],
+    correct: "B",
+    explanation: "Shared logins can't be audited and one breach exposes everyone. Individual logins + MFA means a stolen password alone can't grant access, and you can revoke exactly one person when needed.",
+  },
+  {
+    id: 3,
+    scenario: "Ransomware encrypts all your files at 3am. Which backup strategy actually saves your data?",
+    pillarId: 4,
+    options: [
+      { label: "A", text: "Google Drive synced live from your computer" },
+      { label: "B", text: "External hard drive always plugged into the computer" },
+      { label: "C", text: "Automated daily backup to a versioned cloud service + one offline copy" },
+      { label: "D", text: "Monthly USB backup kept in your desk drawer" },
+    ],
+    correct: "C",
+    explanation: "Live-synced cloud mirrors the encrypted files within minutes — overwriting your good copies. Always-plugged-in drives get encrypted too. Monthly USB means losing 30 days of data. Only versioned, offsite backups survive ransomware.",
+  },
+  {
+    id: 4,
+    scenario: "A program coordinator left your org last month. What should have happened on their last day?",
+    pillarId: 6,
+    options: [
+      { label: "A", text: "Nothing — they left on good terms and signed an NDA" },
+      { label: "B", text: "Changed the office Wi-Fi password" },
+      { label: "C", text: "Revoked all access: email, CRM, Slack, cloud drives — everything" },
+      { label: "D", text: "Asked them to delete work files from their personal device" },
+    ],
+    correct: "C",
+    explanation: "Former staff are among the top sources of data incidents — not always malicious, but always a risk. An offboarding checklist that revokes all system access on the last day is the only reliable protection.",
+  },
+  {
+    id: 5,
+    scenario: "Which MFA method provides the strongest protection for your staff email accounts?",
+    pillarId: 2,
+    options: [
+      { label: "A", text: "SMS text code sent to a phone number" },
+      { label: "B", text: "One-time code sent to your email inbox" },
+      { label: "C", text: "Authenticator app (Google Authenticator / Authy) generating a 6-digit code" },
+      { label: "D", text: "Security questions — mother's maiden name, first pet, etc." },
+    ],
+    correct: "C",
+    explanation: "SMS can be intercepted via SIM-swapping. Email codes are useless if email is what's being hacked. Security questions are easily guessed. Authenticator apps generate codes locally — no network interception possible.",
+  },
 ];
+
+/* ════════════════════════════════════════
+   ANIMATED COUNTER
+════════════════════════════════════════ */
+
+function useCountUp(end: number, decimals = 0, duration = 1400) {
+  const [count, setCount] = useState(0);
+  const started = useRef(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !started.current) {
+          started.current = true;
+          const startTime = performance.now();
+          const tick = (now: number) => {
+            const t = Math.min((now - startTime) / duration, 1);
+            const eased = 1 - Math.pow(1 - t, 3);
+            setCount(parseFloat((eased * end).toFixed(decimals)));
+            if (t < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [end, decimals, duration]);
+
+  return { count, ref };
+}
+
+function AnimatedStat({ stat }: { stat: typeof STATS[0] }) {
+  const { count, ref } = useCountUp(stat.num, stat.decimals);
+  return (
+    <div ref={ref} className="text-center">
+      <div className="text-3xl font-extrabold bg-gradient-to-r from-brand-300 to-accent-400 bg-clip-text text-transparent tabular-nums">
+        {stat.prefix}{count.toFixed(stat.decimals)}{stat.suffix}
+      </div>
+      <div className="mt-1 text-[11px] leading-snug text-muted">{stat.label}</div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   TIP ICONS
+════════════════════════════════════════ */
+
+function TipIcon({ name }: { name: string }) {
+  const c = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (name) {
+    case "key":      return <svg {...c}><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3"/></svg>;
+    case "shield":   return <svg {...c}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+    case "refresh":  return <svg {...c}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>;
+    case "cursor":   return <svg {...c}><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></svg>;
+    case "wifi":     return <svg {...c}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>;
+    case "cloud":    return <svg {...c}><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>;
+    case "lock":     return <svg {...c}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+    case "eye":      return <svg {...c}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+    case "list":     return <svg {...c}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>;
+    case "map":      return <svg {...c}><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>;
+    case "building": return <svg {...c}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
+    case "doc":      return <svg {...c}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>;
+    case "calendar": return <svg {...c}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+    default:         return <svg {...c}><circle cx="12" cy="12" r="10"/></svg>;
+  }
+}
 
 /* ════════════════════════════════════════
    SEVERITY META
@@ -181,7 +333,7 @@ const ORG_TIPS = [
 const SEV: Record<Severity, { label: string; color: string; bg: string; border: string }> = {
   critical: { label: "CRITICAL", color: "#ff453a", bg: "rgba(255,69,58,0.12)",  border: "rgba(255,69,58,0.30)" },
   high:     { label: "HIGH",     color: "#ff9f0a", bg: "rgba(255,159,10,0.10)", border: "rgba(255,159,10,0.28)" },
-  medium:   { label: "MEDIUM",   color: "#ffd60a", bg: "rgba(255,214,10,0.10)",  border: "rgba(255,214,10,0.28)" },
+  medium:   { label: "MEDIUM",   color: "#ffd60a", bg: "rgba(255,214,10,0.10)", border: "rgba(255,214,10,0.28)" },
 };
 
 /* ════════════════════════════════════════
@@ -201,12 +353,10 @@ function PillarCard({ p }: { p: Pillar }) {
       transition={{ duration: 0.45 }}
       className="card overflow-hidden"
     >
-      {/* Header row */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-start gap-4 p-6 text-left transition hover:bg-white/[0.02]"
       >
-        {/* Pillar number */}
         <div className="flex-none">
           <div
             className="flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold tabular-nums"
@@ -215,8 +365,6 @@ function PillarCard({ p }: { p: Pillar }) {
             {String(p.id).padStart(2, "0")}
           </div>
         </div>
-
-        {/* Title + meta */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-bold">{p.title}</h3>
@@ -227,18 +375,12 @@ function PillarCard({ p }: { p: Pillar }) {
               {s.label}
             </span>
           </div>
-
-          {/* Key stat */}
           <div className="mt-1.5 flex items-baseline gap-1.5">
             <span className="text-2xl font-extrabold" style={{ color: s.color }}>{p.stat}</span>
             <span className="text-xs text-muted leading-tight">{p.statLabel}</span>
           </div>
-
-          {/* What it is — always visible preview */}
           <p className="mt-2 text-sm leading-relaxed text-muted line-clamp-2">{p.what}</p>
         </div>
-
-        {/* Expand toggle */}
         <div
           className="flex-none text-muted transition-transform duration-200"
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
@@ -247,7 +389,6 @@ function PillarCard({ p }: { p: Pillar }) {
         </div>
       </button>
 
-      {/* Expandable body */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -259,8 +400,6 @@ function PillarCard({ p }: { p: Pillar }) {
             className="overflow-hidden"
           >
             <div className="space-y-5 border-t border-white/[0.06] px-6 pb-6 pt-5">
-
-              {/* Full "what" paragraph */}
               <div>
                 <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-brand-400">
                   What this means
@@ -268,7 +407,6 @@ function PillarCard({ p }: { p: Pillar }) {
                 <p className="text-sm leading-relaxed text-fg/88">{p.what}</p>
               </div>
 
-              {/* Scenario */}
               <div
                 className="rounded-xl border-l-4 px-4 py-3"
                 style={{ borderColor: s.color, background: s.bg }}
@@ -279,7 +417,6 @@ function PillarCard({ p }: { p: Pillar }) {
                 <p className="text-sm italic leading-relaxed text-fg/90">{p.scenario}</p>
               </div>
 
-              {/* Connected pillars */}
               {p.connectedTo.length > 0 && (
                 <div>
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted">
@@ -305,7 +442,6 @@ function PillarCard({ p }: { p: Pillar }) {
                 </div>
               )}
 
-              {/* Quick tips */}
               <div>
                 <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-widest text-accent-400">
                   Quick actions
@@ -322,7 +458,6 @@ function PillarCard({ p }: { p: Pillar }) {
                 </ul>
               </div>
 
-              {/* Quick win highlight */}
               <div className="card-glow-lime rounded-xl border border-accent-500/25 bg-accent-500/8 px-4 py-3">
                 <div className="mb-1 text-[11px] font-bold uppercase tracking-widest text-accent-400">
                   Quick win — do this today
@@ -330,7 +465,6 @@ function PillarCard({ p }: { p: Pillar }) {
                 <p className="text-sm leading-relaxed text-fg">{p.quickWin}</p>
               </div>
 
-              {/* Deep dive toggle */}
               <button
                 onClick={() => setDeepOpen((v) => !v)}
                 className="flex items-center gap-2 text-xs text-brand-400 hover:text-brand-300 transition"
@@ -362,6 +496,356 @@ function PillarCard({ p }: { p: Pillar }) {
 }
 
 /* ════════════════════════════════════════
+   CHECKLIST TAB (Personal / Org)
+════════════════════════════════════════ */
+
+function ChecklistTab({
+  tips,
+  accentColor,
+  badgeLabel,
+  badgeBg,
+  badgeBorder,
+  title,
+  subtitle,
+}: {
+  tips: readonly { tip: string; detail: string; icon: string }[];
+  accentColor: string;
+  badgeLabel: string;
+  badgeBg: string;
+  badgeBorder: string;
+  title: string;
+  subtitle: string;
+}) {
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const pct = Math.round((checked.size / tips.length) * 100);
+
+  const toggle = (i: number) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+
+  return (
+    <div className="pb-6">
+      <div className="mb-5">
+        <div
+          className="mb-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
+          style={{ color: accentColor, background: badgeBg, border: `1px solid ${badgeBorder}` }}
+        >
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: accentColor }} />
+          {badgeLabel}
+        </div>
+        <h2 className="mb-1 text-2xl font-bold tracking-tight">{title}</h2>
+        <p className="text-sm text-muted">{subtitle}</p>
+      </div>
+
+      {/* Progress bar */}
+      <div className="card mb-5 p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-semibold">
+            {checked.size === 0
+              ? "Start checking items off as you complete them"
+              : checked.size === tips.length
+              ? "All done — great work! 🎉"
+              : `${checked.size} of ${tips.length} complete`}
+          </span>
+          <span className="text-sm font-bold tabular-nums" style={{ color: accentColor }}>
+            {pct}%
+          </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: accentColor }}
+            animate={{ width: `${pct}%` }}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {tips.map((t, i) => {
+          const done = checked.has(i);
+          return (
+            <motion.button
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: i * 0.04 }}
+              onClick={() => toggle(i)}
+              className="card flex items-start gap-3.5 p-4 text-left transition-all duration-200"
+              style={done ? { background: "rgba(255,255,255,0.06)", borderColor: accentColor + "55" } : {}}
+            >
+              {/* Checkbox */}
+              <div
+                className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full border-2 transition-all duration-200"
+                style={
+                  done
+                    ? { background: accentColor, borderColor: accentColor }
+                    : { borderColor: "rgba(255,255,255,0.2)" }
+                }
+              >
+                {done && (
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4l3 3 5-6" stroke="#000" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+
+              {/* Icon */}
+              <div className="mt-0.5 flex-none" style={{ color: done ? accentColor : "rgba(255,255,255,0.35)" }}>
+                <TipIcon name={t.icon} />
+              </div>
+
+              <div className="min-w-0">
+                <div className={`text-sm font-semibold transition-colors ${done ? "line-through opacity-60" : ""}`}>
+                  {t.tip}
+                </div>
+                <div className="mt-0.5 text-xs leading-relaxed text-muted">{t.detail}</div>
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   QUIZ TAB
+════════════════════════════════════════ */
+
+function QuizTab() {
+  const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [done, setDone] = useState(false);
+
+  const q = QUIZ[current];
+  const answered = selected !== null;
+  const isCorrect = selected === q.correct;
+
+  const pick = (label: string) => {
+    if (answered) return;
+    setSelected(label);
+  };
+
+  const next = () => {
+    if (!selected) return;
+    const next = { ...answers, [q.id]: selected };
+    setAnswers(next);
+    if (current < QUIZ.length - 1) {
+      setCurrent((c) => c + 1);
+      setSelected(null);
+    } else {
+      setDone(true);
+    }
+  };
+
+  const restart = () => {
+    setCurrent(0);
+    setSelected(null);
+    setAnswers({});
+    setDone(false);
+  };
+
+  if (done) {
+    const score = QUIZ.filter((q) => answers[q.id] === q.correct).length;
+    const missed = QUIZ.filter((q) => answers[q.id] !== q.correct);
+    const pct = Math.round((score / QUIZ.length) * 100);
+    const grade =
+      score === 5 ? { label: "Perfect score", color: "#30d158", msg: "Your team is well-prepared. Share this quiz with your volunteers." }
+      : score >= 4 ? { label: "Strong", color: "#30d158", msg: "Nearly perfect — review the missed scenario below and you're set." }
+      : score >= 3 ? { label: "Good foundation", color: "#ffd60a", msg: "You know the basics. Focus on the pillar(s) below where you missed." }
+      : score >= 2 ? { label: "Needs attention", color: "#ff9f0a", msg: "A few critical gaps — read the pillar cards for the missed topics." }
+      : { label: "High risk", color: "#ff453a", msg: "Start with the 7 Pillars tab and share this quiz with your leadership team." };
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="pb-6 space-y-5"
+      >
+        <div className="card p-7 text-center">
+          <div
+            className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full text-3xl font-extrabold"
+            style={{ background: grade.color + "22", color: grade.color, border: `2px solid ${grade.color}55` }}
+          >
+            {pct}%
+          </div>
+          <div className="text-2xl font-bold">{grade.label}</div>
+          <div className="mt-1 text-sm text-muted">{score} / {QUIZ.length} correct</div>
+          <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-fg/80">{grade.msg}</p>
+        </div>
+
+        {missed.length > 0 && (
+          <div className="card p-5 space-y-4">
+            <h3 className="text-base font-bold">Review: what to focus on</h3>
+            {missed.map((mq) => {
+              const pillar = PILLARS.find((p) => p.id === mq.pillarId)!;
+              const s = SEV[pillar.severity];
+              return (
+                <div key={mq.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="text-xs font-bold" style={{ color: s.color }}>
+                      Pillar #{pillar.id} — {pillar.title}
+                    </span>
+                  </div>
+                  <p className="mb-2 text-xs italic text-muted">"{mq.scenario}"</p>
+                  <div className="rounded-lg bg-risk-crit/10 border border-risk-crit/25 px-3 py-2 text-xs text-fg/85">
+                    <span className="font-semibold text-risk-high">Correct answer ({mq.correct}): </span>
+                    {mq.options.find((o) => o.label === mq.correct)?.text}
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-muted">{mq.explanation}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex justify-center">
+          <button
+            onClick={restart}
+            className="rounded-xl border border-white/12 px-5 py-2.5 text-sm font-medium text-muted transition hover:border-white/25 hover:text-fg"
+          >
+            ↺ Retake quiz
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <div className="pb-6 space-y-5">
+      {/* Progress */}
+      <div className="flex items-center gap-3">
+        <div className="flex gap-1.5">
+          {QUIZ.map((_, i) => (
+            <div
+              key={i}
+              className="h-1.5 rounded-full transition-all duration-300"
+              style={{
+                width: i === current ? 24 : 8,
+                background: i < current ? "#30d158" : i === current ? "#0a84ff" : "rgba(255,255,255,0.15)",
+              }}
+            />
+          ))}
+        </div>
+        <span className="text-xs text-muted">{current + 1} / {QUIZ.length}</span>
+      </div>
+
+      {/* Question */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={q.id}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2 }}
+          className="space-y-4"
+        >
+          <div className="card p-5">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-brand-400">
+              Scenario {current + 1}
+            </div>
+            <p className="text-base font-semibold leading-snug">{q.scenario}</p>
+          </div>
+
+          <div className="space-y-2.5">
+            {q.options.map((opt) => {
+              const isSelected = selected === opt.label;
+              const isRight = answered && opt.label === q.correct;
+              const isWrong = answered && isSelected && !isRight;
+              return (
+                <motion.button
+                  key={opt.label}
+                  onClick={() => pick(opt.label)}
+                  disabled={answered}
+                  whileHover={!answered ? { scale: 1.01 } : {}}
+                  whileTap={!answered ? { scale: 0.99 } : {}}
+                  className="flex w-full items-start gap-3.5 rounded-xl border p-4 text-left transition-all duration-200"
+                  style={{
+                    borderColor: isRight
+                      ? "#30d158"
+                      : isWrong
+                      ? "#ff453a"
+                      : isSelected
+                      ? "#0a84ff"
+                      : "rgba(255,255,255,0.08)",
+                    background: isRight
+                      ? "rgba(48,209,88,0.10)"
+                      : isWrong
+                      ? "rgba(255,69,58,0.10)"
+                      : isSelected
+                      ? "rgba(10,132,255,0.10)"
+                      : "rgba(255,255,255,0.02)",
+                    cursor: answered ? "default" : "pointer",
+                  }}
+                >
+                  <span
+                    className="grid h-7 w-7 flex-none place-items-center rounded-full text-[11px] font-bold transition-colors"
+                    style={{
+                      background: isRight
+                        ? "#30d158"
+                        : isWrong
+                        ? "#ff453a"
+                        : isSelected
+                        ? "#0a84ff"
+                        : "rgba(255,255,255,0.08)",
+                      color: isRight || isWrong || isSelected ? "#fff" : "rgba(255,255,255,0.5)",
+                    }}
+                  >
+                    {isRight ? "✓" : isWrong ? "✗" : opt.label}
+                  </span>
+                  <span className="text-sm leading-snug pt-1">{opt.text}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* Explanation */}
+          <AnimatePresence>
+            {answered && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border px-4 py-3"
+                style={
+                  isCorrect
+                    ? { borderColor: "rgba(48,209,88,0.35)", background: "rgba(48,209,88,0.08)" }
+                    : { borderColor: "rgba(255,159,10,0.35)", background: "rgba(255,159,10,0.08)" }
+                }
+              >
+                <div
+                  className="mb-1 text-[11px] font-bold uppercase tracking-widest"
+                  style={{ color: isCorrect ? "#30d158" : "#ff9f0a" }}
+                >
+                  {isCorrect ? "Correct!" : "Not quite"}
+                </div>
+                <p className="text-sm leading-relaxed text-fg/88">{q.explanation}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {answered && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-end">
+              <button
+                onClick={next}
+                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition"
+                style={{ background: "linear-gradient(135deg, #0a84ff, #32ade6)" }}
+              >
+                {current < QUIZ.length - 1 ? "Next question →" : "See my results →"}
+              </button>
+            </motion.div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
    TABS CONFIG
 ════════════════════════════════════════ */
 
@@ -370,6 +854,7 @@ const TABS = [
   { id: "pillars",   label: "7 Pillars" },
   { id: "personal",  label: "Protect Yourself" },
   { id: "org",       label: "For Organizations" },
+  { id: "quiz",      label: "Test Yourself" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -388,7 +873,7 @@ export default function LearnMore() {
 
       <main className="mx-auto max-w-4xl px-6">
 
-        {/* ── Hero (always visible) ── */}
+        {/* ── Hero ── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -408,7 +893,7 @@ export default function LearnMore() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-xl text-[14px] leading-relaxed text-muted">
-            Understand the most common cyber vulnerabilities and how to close them — for individuals and organizations.
+            Understand the most common cyber vulnerabilities, take our quiz to test your readiness, and check off actions as you complete them.
           </p>
         </motion.div>
 
@@ -422,6 +907,7 @@ export default function LearnMore() {
           <div className="card inline-flex min-w-full gap-1 p-1.5 sm:min-w-0 sm:w-full">
             {TABS.map((t) => {
               const active = activeTab === t.id;
+              const isQuiz = t.id === "quiz";
               return (
                 <button
                   key={t.id}
@@ -429,12 +915,23 @@ export default function LearnMore() {
                   className="relative flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200"
                   style={
                     active
-                      ? { background: "linear-gradient(135deg, #0a84ff, #32ade6)", color: "#fff", boxShadow: "0 2px 12px rgba(99,102,241,0.35)" }
-                      : { color: "var(--color-muted)" }
+                      ? isQuiz
+                        ? { background: "linear-gradient(135deg, #30d158, #0a84ff)", color: "#fff", boxShadow: "0 2px 12px rgba(48,209,88,0.35)" }
+                        : { background: "linear-gradient(135deg, #0a84ff, #32ade6)", color: "#fff", boxShadow: "0 2px 12px rgba(99,102,241,0.35)" }
+                      : isQuiz
+                        ? { color: "#30d158", border: "1px solid rgba(48,209,88,0.3)", background: "rgba(48,209,88,0.08)" }
+                        : { color: "var(--color-muted)" }
                   }
                 >
                   <span className="hidden sm:inline">{t.label}</span>
                   <span className="sm:hidden text-xs">{t.label.split(" ")[0]}</span>
+                  {isQuiz && !active && (
+                    <motion.span
+                      animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+                      transition={{ duration: 1.6, repeat: Infinity }}
+                      className="h-1.5 w-1.5 rounded-full bg-accent-500"
+                    />
+                  )}
                 </button>
               );
             })}
@@ -443,6 +940,7 @@ export default function LearnMore() {
 
         {/* ── Tab panels ── */}
         <AnimatePresence mode="wait">
+
           {/* ─ Overview ─ */}
           {activeTab === "overview" && (
             <motion.div
@@ -453,19 +951,10 @@ export default function LearnMore() {
               transition={{ duration: 0.25 }}
               className="space-y-6 pb-6"
             >
-              {/* Stats */}
               <div className="card grid gap-6 p-6 sm:grid-cols-4">
-                {STATS.map((s) => (
-                  <div key={s.value} className="text-center">
-                    <div className="text-3xl font-extrabold bg-gradient-to-r from-brand-300 to-accent-400 bg-clip-text text-transparent">
-                      {s.value}
-                    </div>
-                    <div className="mt-1 text-[11px] leading-snug text-muted">{s.label}</div>
-                  </div>
-                ))}
+                {STATS.map((s, i) => <AnimatedStat key={i} stat={s} />)}
               </div>
 
-              {/* What this page covers */}
               <div className="card p-6 space-y-4">
                 <h2 className="text-lg font-bold">What you'll find here</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -479,8 +968,9 @@ export default function LearnMore() {
                         <div className="text-sm font-semibold text-fg">{t.label}</div>
                         <div className="mt-0.5 text-xs text-muted">
                           {t.id === "pillars"  && "The 7 most exploited nonprofit vulnerabilities — click any to expand"}
-                          {t.id === "personal" && "8 actions every individual should take to stay safe"}
-                          {t.id === "org"      && "Process & policy improvements that protect your whole organization"}
+                          {t.id === "personal" && "8 actions every individual should take — check them off as you go"}
+                          {t.id === "org"      && "Process & policy improvements with an interactive checklist"}
+                          {t.id === "quiz"     && "5 scenario-based questions — see how your team would handle a real attack"}
                         </div>
                       </div>
                       <span className="ml-auto text-muted opacity-50">›</span>
@@ -489,7 +979,6 @@ export default function LearnMore() {
                 </div>
               </div>
 
-              {/* Connection note */}
               <div className="rounded-xl border border-brand-500/20 bg-brand-500/[0.06] px-5 py-4">
                 <p className="text-sm leading-relaxed text-fg/88">
                   <span className="font-semibold text-brand-300">These pillars are interconnected.</span>{" "}
@@ -499,16 +988,11 @@ export default function LearnMore() {
                 </p>
               </div>
 
-              {/* CTA */}
               <div className="card card-glow rounded-2xl p-6 text-center">
                 <h2 className="mb-2 text-lg font-bold">Ready to check your actual exposure?</h2>
                 <p className="mb-5 text-sm text-muted">Use Aegis's tools to see which risks apply to you right now.</p>
                 <div className="flex flex-wrap justify-center gap-3">
-                  <button
-                    onClick={() => nav("/")}
-                    className="p-btn p-prim-col"
-                    style={{ margin: 0 }}
-                  >
+                  <button onClick={() => nav("/")} className="p-btn p-prim-col" style={{ margin: 0 }}>
                     Scan for breach exposure
                   </button>
                   <button
@@ -548,9 +1032,9 @@ export default function LearnMore() {
               transition={{ duration: 0.25 }}
               className="space-y-4 pb-6"
             >
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm text-muted">Click any card to expand — each shows a real-world scenario, connections to other pillars, and a quick win you can do today.</p>
-              </div>
+              <p className="text-sm text-muted">
+                Click any card to expand — each shows a real-world scenario, connections to other pillars, and a quick win you can do today.
+              </p>
               {PILLARS.map((p) => (
                 <PillarCard key={p.id} p={p} />
               ))}
@@ -565,33 +1049,16 @@ export default function LearnMore() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25 }}
-              className="pb-6"
             >
-              <div className="mb-6">
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-brand-500/25 bg-brand-500/8 px-3 py-1 text-xs font-medium text-brand-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> For individuals
-                </div>
-                <h2 className="mb-1 text-2xl font-bold tracking-tight">Personal Protection Checklist</h2>
-                <p className="text-sm text-muted">
-                  Things every person — staff, volunteer, or board member — should do regardless of their role.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {PERSONAL_TIPS.map((t, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: i * 0.05 }}
-                    className="card flex items-start gap-3.5 p-4"
-                  >
-                    <div>
-                      <div className="text-sm font-semibold">{t.tip}</div>
-                      <div className="mt-0.5 text-xs leading-relaxed text-muted">{t.detail}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+              <ChecklistTab
+                tips={PERSONAL_TIPS}
+                accentColor="#0a84ff"
+                badgeLabel="For individuals"
+                badgeBg="rgba(10,132,255,0.10)"
+                badgeBorder="rgba(10,132,255,0.25)"
+                title="Personal Protection Checklist"
+                subtitle="Things every person — staff, volunteer, or board member — should do regardless of their role."
+              />
             </motion.div>
           )}
 
@@ -603,44 +1070,22 @@ export default function LearnMore() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25 }}
-              className="pb-6"
             >
-              <div className="mb-6">
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-accent-500/25 bg-accent-500/8 px-3 py-1 text-xs font-medium text-accent-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent-400" /> For organizations
-                </div>
-                <h2 className="mb-1 text-2xl font-bold tracking-tight">Organizational Security Checklist</h2>
-                <p className="text-sm text-muted">
-                  Process and policy improvements that protect the whole organization, not just individual accounts.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 mb-8">
-                {ORG_TIPS.map((t, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: i * 0.05 }}
-                    className="card flex items-start gap-3.5 p-4"
-                  >
-                    <div>
-                      <div className="text-sm font-semibold">{t.tip}</div>
-                      <div className="mt-0.5 text-xs leading-relaxed text-muted">{t.detail}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+              <ChecklistTab
+                tips={ORG_TIPS}
+                accentColor="#30d158"
+                badgeLabel="For organizations"
+                badgeBg="rgba(48,209,88,0.08)"
+                badgeBorder="rgba(48,209,88,0.25)"
+                title="Organizational Security Checklist"
+                subtitle="Process and policy improvements that protect the whole organization, not just individual accounts."
+              />
 
-              {/* Inline CTA at bottom of org tab */}
-              <div className="card card-glow-lime rounded-2xl border border-accent-500/20 p-6 text-center">
+              <div className="card card-glow-lime mt-5 rounded-2xl border border-accent-500/20 p-6 text-center">
                 <h3 className="mb-1 text-base font-bold">Need help getting started?</h3>
                 <p className="mb-4 text-sm text-muted">Use Aegis's tools to assess your organization's current exposure.</p>
                 <div className="flex flex-wrap justify-center gap-3">
-                  <button
-                    onClick={() => nav("/")}
-                    className="p-btn p-prim-col"
-                    style={{ margin: 0 }}
-                  >
+                  <button onClick={() => nav("/")} className="p-btn p-prim-col" style={{ margin: 0 }}>
                     Breach Detector
                   </button>
                   <button
@@ -659,6 +1104,29 @@ export default function LearnMore() {
               </div>
             </motion.div>
           )}
+
+          {/* ─ Quiz ─ */}
+          {activeTab === "quiz" && (
+            <motion.div
+              key="quiz"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+            >
+              <div className="mb-5">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-accent-500/25 bg-accent-500/8 px-3 py-1 text-xs font-medium text-accent-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent-400" /> 5 questions
+                </div>
+                <h2 className="mb-1 text-2xl font-bold tracking-tight">How would your team respond?</h2>
+                <p className="text-sm text-muted">
+                  Real scenarios nonprofit staff actually face. No trick questions — just practical judgment calls.
+                </p>
+              </div>
+              <QuizTab />
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </main>
     </div>
