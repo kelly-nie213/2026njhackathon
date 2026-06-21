@@ -70,12 +70,79 @@ export interface DomainSecurity {
   spoofable: boolean;
 }
 
+export interface WebCheckItem {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  severity: Severity;
+  title: string;
+  detail: string;
+  evidence: string;
+}
+
+export interface WebSecurity {
+  domain: string;
+  checks: WebCheckItem[];
+  worst: Severity;
+  grade: string;
+  https: boolean;
+}
+
+export interface ReputationItem {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  severity: Severity;
+  title: string;
+  detail: string;
+  evidence: string;
+}
+
+export interface Reputation {
+  domain: string;
+  flagged: boolean;
+  worst: Severity;
+  checks: ReputationItem[];
+  notChecked: { name: string; reason: string }[];
+  sourcesChecked: number;
+}
+
 /* --------------------------- API calls --------------------------- */
 
 /** Live DNS spoofing-protection check. Returns null on failure (optional in the UI). */
 export async function checkDomainSecurity(domain: string): Promise<DomainSecurity | null> {
   try {
     const res = await fetch("/api/domain-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain }),
+    });
+    if (res.ok) return res.json();
+  } catch {
+    /* optional — don't sink the scan */
+  }
+  return null;
+}
+
+/** Live TLS + HTTP-security-headers check. Returns null on failure (optional in the UI). */
+export async function checkWebSecurity(domain: string): Promise<WebSecurity | null> {
+  try {
+    const res = await fetch("/api/web-security", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain }),
+    });
+    if (res.ok) return res.json();
+  } catch {
+    /* optional — don't sink the scan */
+  }
+  return null;
+}
+
+/** Live threat-intel / reputation check. Returns null on failure (optional in the UI). */
+export async function checkReputation(domain: string): Promise<Reputation | null> {
+  try {
+    const res = await fetch("/api/reputation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ domain }),
@@ -115,7 +182,9 @@ export async function generateReport(
   crawl: CrawlResult,
   lookup: BreachLookup,
   orgName: string,
-  domainSec?: DomainSecurity | null
+  domainSec?: DomainSecurity | null,
+  webSec?: WebSecurity | null,
+  reputation?: Reputation | null
 ): Promise<{ report: BreachReport; source: "ai" | "fallback" }> {
   try {
     const res = await fetch("/api/breach-report", {
@@ -142,13 +211,29 @@ export async function generateReport(
               })),
             }
           : null,
+        webSecurity: webSec
+          ? {
+              grade: webSec.grade,
+              checks: webSec.checks
+                .filter((c) => c.status !== "pass")
+                .map((c) => ({ label: c.label, status: c.status, title: c.title })),
+            }
+          : null,
+        reputation: reputation
+          ? {
+              flagged: reputation.flagged,
+              hits: reputation.checks
+                .filter((c) => c.status === "fail")
+                .map((c) => ({ label: c.label, title: c.title })),
+            }
+          : null,
       }),
     });
     if (res.ok) return { report: await res.json(), source: "ai" };
   } catch {
     /* fall through */
   }
-  return { report: buildReport(crawl, lookup, domainSec), source: "fallback" };
+  return { report: buildReport(crawl, lookup, domainSec, webSec, reputation), source: "fallback" };
 }
 
 /* ----------------------- deterministic engine ----------------------- */
@@ -173,7 +258,9 @@ export function overallSeverity(lookup: BreachLookup): Severity {
 function buildReport(
   crawl: CrawlResult,
   lookup: BreachLookup,
-  domainSec?: DomainSecurity | null
+  domainSec?: DomainSecurity | null,
+  webSec?: WebSecurity | null,
+  reputation?: Reputation | null
 ): BreachReport {
   const breached = lookup.results.filter((r) => r.status === "breached");
   const worst = [...breached].sort((a, b) => b.breachCount - a.breachCount)[0];
@@ -182,6 +269,19 @@ function buildReport(
   );
 
   const risks: RiskItem[] = [];
+
+  if (reputation?.flagged) {
+    const hits = reputation.checks.filter((c) => c.status === "fail");
+    risks.push({
+      title: "Your domain is flagged on threat-intelligence blocklists",
+      severity: "critical",
+      consequence:
+        "Live threat feeds (" +
+        hits.map((c) => c.label).join(", ") +
+        ") report this domain is distributing malware or hosting phishing. Visitors' browsers may warn or block your site, donors will distrust you, and it often means the site is already compromised. Treat this as an active incident.",
+      whoAtRisk: ["Everyone who visits your site", "Donors & supporters", "Your reputation"],
+    });
+  }
 
   if (domainSec?.spoofable) {
     risks.push({
@@ -214,6 +314,22 @@ function buildReport(
         "payments, or send fraud from a real, trusted account. This is the single fastest way in.",
       whoAtRisk: worst ? [worst.email] : ["Anyone reusing passwords"],
     });
+  }
+
+  if (webSec) {
+    const webIssues = webSec.checks.filter((c) => c.status !== "pass");
+    if (webIssues.length > 0) {
+      const sev = webSec.worst === "critical" ? "critical" : webSec.worst === "high" ? "high" : "medium";
+      risks.push({
+        title: `Website security gaps (grade ${webSec.grade})`,
+        severity: sev,
+        consequence:
+          "Missing protections in how your site is served — " +
+          webIssues.slice(0, 4).map((c) => c.label).join(", ") +
+          " — leave visitors open to attacks like cross-site scripting, clickjacking, or traffic interception.",
+        whoAtRisk: ["Anyone who visits your website", "Logged-in staff/admins"],
+      });
+    }
   }
 
   if (crawl.emails.length > 0) {
@@ -296,6 +412,19 @@ function buildReport(
       ],
     },
   ];
+
+  if (webSec && webSec.checks.some((c) => c.status !== "pass")) {
+    actions.push({
+      title: "Add the missing web security headers (and keep HTTPS healthy)",
+      why: "These headers are how the browser blocks XSS, clickjacking and traffic interception. They're set once at your web host/CDN and protect every visitor.",
+      effort: "1 hour",
+      steps: [
+        "Ask your host/CDN (Cloudflare, Netlify, etc.) to add: Content-Security-Policy, Strict-Transport-Security (HSTS), X-Frame-Options, and X-Content-Type-Options: nosniff.",
+        "Make sure http:// redirects to https:// and your certificate auto-renews.",
+        "Re-run this scan to confirm the grade improves.",
+      ],
+    });
+  }
 
   if (domainSec?.spoofable) {
     actions.unshift({

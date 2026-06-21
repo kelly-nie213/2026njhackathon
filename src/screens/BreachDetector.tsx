@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Nav } from "../components/Nav";
 import {
@@ -6,6 +6,8 @@ import {
   lookupBreaches,
   generateReport,
   checkDomainSecurity,
+  checkWebSecurity,
+  checkReputation,
   breachedAccounts,
   totalBreaches,
   SEVERITY_META,
@@ -13,6 +15,8 @@ import {
   type BreachLookup,
   type BreachReport,
   type DomainSecurity,
+  type WebSecurity,
+  type Reputation,
   type EmailBreach,
 } from "../lib/breach";
 import {
@@ -31,6 +35,8 @@ const SCAN_STEPS = [
   "Crawling public pages for contact info…",
   "Extracting emails, names & phone numbers…",
   "Checking your domain's email-spoofing protection (DNS)…",
+  "Checking HTTPS, TLS & web security headers…",
+  "Checking threat-intel blocklists for malware/phishing…",
   "Checking each email against breach databases…",
   "Scanning your site's code for bugs & security holes…",
   "Assessing risks and writing your action plan…",
@@ -46,6 +52,8 @@ export default function BreachDetector() {
   const [crawl, setCrawl] = useState<CrawlResult | null>(null);
   const [lookup, setLookup] = useState<BreachLookup | null>(null);
   const [domainSec, setDomainSec] = useState<DomainSecurity | null>(null);
+  const [webSec, setWebSec] = useState<WebSecurity | null>(null);
+  const [reputation, setReputation] = useState<Reputation | null>(null);
   const [report, setReport] = useState<BreachReport | null>(null);
   const [reportSource, setReportSource] = useState<"ai" | "fallback">("fallback");
   const [jsAudit, setJsAudit] = useState<JsAuditResult | null>(null);
@@ -69,22 +77,26 @@ export default function BreachDetector() {
       // independent of each other — run them together. The code audit is optional:
       // if it fails, it shouldn't sink the rest of the report.
       setStep(3);
-      const [domainSecRes, lookupRes, auditRes] = await Promise.all([
+      const [domainSecRes, webSecRes, repRes, lookupRes, auditRes] = await Promise.all([
         checkDomainSecurity(cleanDomain),
+        checkWebSecurity(cleanDomain),
+        checkReputation(cleanDomain),
         crawlRes.emails.length
           ? lookupBreaches(crawlRes.emails)
           : Promise.resolve({ source: "live" as const, results: [] }),
         auditJs(cleanDomain).catch(() => null),
       ]);
       setDomainSec(domainSecRes);
+      setWebSec(webSecRes);
+      setReputation(repRes);
       setLookup(lookupRes);
       setJsAudit(auditRes);
-      setStep(6);
+      setStep(8);
 
       // Breach report + code-audit report are separate AI calls — run in parallel.
       const orgLabel = orgName.trim() || crawlRes.domain;
       const [breachOut, jsOut] = await Promise.all([
-        generateReport(crawlRes, lookupRes, orgLabel, domainSecRes),
+        generateReport(crawlRes, lookupRes, orgLabel, domainSecRes, webSecRes, repRes),
         auditRes ? generateJsReport(auditRes, orgLabel) : Promise.resolve(null),
       ]);
       setReport(breachOut.report);
@@ -112,6 +124,8 @@ export default function BreachDetector() {
     setCrawl(null);
     setLookup(null);
     setDomainSec(null);
+    setWebSec(null);
+    setReputation(null);
     setReport(null);
     setJsAudit(null);
     setJsReport(null);
@@ -149,6 +163,8 @@ export default function BreachDetector() {
               crawl={crawl}
               lookup={lookup}
               domainSec={domainSec}
+              webSec={webSec}
+              reputation={reputation}
               report={report}
               reportSource={reportSource}
               jsAudit={jsAudit}
@@ -553,6 +569,8 @@ function ReportView(props: {
   crawl: CrawlResult;
   lookup: BreachLookup;
   domainSec: DomainSecurity | null;
+  webSec: WebSecurity | null;
+  reputation: Reputation | null;
   report: BreachReport;
   reportSource: "ai" | "fallback";
   jsAudit: JsAuditResult | null;
@@ -560,11 +578,20 @@ function ReportView(props: {
   jsReportSource: "ai" | "fallback";
   onReset: () => void;
 }) {
-  const { orgName, crawl, lookup, domainSec, report, reportSource, jsAudit, jsReport, jsReportSource, onReset } = props;
+  const { orgName, crawl, lookup, domainSec, webSec, reputation, report, reportSource, jsAudit, jsReport, jsReportSource, onReset } = props;
   const breachedCount = breachedAccounts(lookup);
   const totalB = totalBreaches(lookup);
   const [reportTab, setReportTab] = useState<ReportTab>("found");
   const [demoId, setDemoId] = useState<DemoId>("all");
+
+  // When the tab changes, bring the tab bar (and the panel right under it) into
+  // view so the switch is always visible, even from far down a long panel.
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const firstTab = useRef(true);
+  useEffect(() => {
+    if (firstTab.current) { firstTab.current = false; return; }
+    tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [reportTab]);
 
   return (
     <motion.div
@@ -605,8 +632,8 @@ function ReportView(props: {
         <Stat label="Names & phones exposed" value={crawl.names.length + crawl.phones.length} accent="med"  />
       </div>
 
-      {/* ── Tab bar ── */}
-      <div className="card flex gap-1.5 p-1.5">
+      {/* ── Tab bar (sticky so switching is always reachable & visible) ── */}
+      <div ref={tabsRef} className="card sticky top-3 z-20 flex gap-1.5 p-1.5 scroll-mt-3">
         {REPORT_TABS.map((t) => {
           const active = reportTab === t.id;
           const isAction = t.id === "action";
@@ -641,9 +668,6 @@ function ReportView(props: {
         })}
       </div>
 
-      {/* domain spoofing protection (live DNS) */}
-      {domainSec && <DomainSecurityCard sec={domainSec} />}
-
       {/* ── Tab panels ── */}
       <AnimatePresence mode="wait">
 
@@ -655,31 +679,47 @@ function ReportView(props: {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.2 }}
-            className="card p-6 space-y-5"
+            className="space-y-5"
           >
-            <div>
-              <h2 className="text-lg font-bold">What we harvested from your site</h2>
-              <p className="mt-1 text-sm text-muted">Public data an attacker could scrape in seconds.</p>
+            {/* threat-intel reputation (live blocklists) */}
+            {reputation && <ReputationCard rep={reputation} />}
+
+            <div className="card p-6 space-y-5">
+              <div>
+                <h2 className="text-lg font-bold">What we harvested from your site</h2>
+                <p className="mt-1 text-sm text-muted">Public data an attacker could scrape in seconds.</p>
+              </div>
+
+              {lookup.results.length > 0 ? (
+                <div className="space-y-2.5">
+                  {lookup.results
+                    .slice()
+                    .sort((a, b) => b.breachCount - a.breachCount)
+                    .map((r) => <EmailRow key={r.email} r={r} />)}
+                </div>
+              ) : (
+                <p className="rounded-xl bg-white/[0.03] px-3 py-3 text-sm text-muted">
+                  No public email addresses found — good for your attack surface.
+                </p>
+              )}
+
+              {(crawl.names.length > 0 || crawl.phones.length > 0) && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {crawl.names.length  > 0 && <Chips title="Names found"         items={crawl.names}  icon="👤" />}
+                  {crawl.phones.length > 0 && <Chips title="Phone numbers found" items={crawl.phones} icon="📞" />}
+                </div>
+              )}
             </div>
 
-            {lookup.results.length > 0 ? (
-              <div className="space-y-2.5">
-                {lookup.results
-                  .slice()
-                  .sort((a, b) => b.breachCount - a.breachCount)
-                  .map((r) => <EmailRow key={r.email} r={r} />)}
-              </div>
-            ) : (
-              <p className="rounded-xl bg-white/[0.03] px-3 py-3 text-sm text-muted">
-                No public email addresses found — good for your attack surface.
-              </p>
-            )}
+            {/* domain spoofing protection (live DNS) */}
+            {domainSec && <DomainSecurityCard sec={domainSec} />}
 
-            {(crawl.names.length > 0 || crawl.phones.length > 0) && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {crawl.names.length  > 0 && <Chips title="Names found"         items={crawl.names}  icon="👤" />}
-                {crawl.phones.length > 0 && <Chips title="Phone numbers found" items={crawl.phones} icon="📞" />}
-              </div>
+            {/* web security: TLS + HTTP headers (live) */}
+            {webSec && <WebSecurityCard sec={webSec} />}
+
+            {/* website code security (combined JS audit) */}
+            {jsAudit && (
+              <CodeSecuritySection audit={jsAudit} report={jsReport} reportSource={jsReportSource} />
             )}
           </motion.div>
         )}
@@ -868,11 +908,6 @@ function ReportView(props: {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* website code security (combined JS audit) */}
-      {jsAudit && (
-        <CodeSecuritySection audit={jsAudit} report={jsReport} reportSource={jsReportSource} />
-      )}
     </motion.div>
   );
 }
@@ -1077,6 +1112,115 @@ function DomainSecurityCard({ sec }: { sec: DomainSecurity }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function WebSecurityCard({ sec }: { sec: WebSecurity }) {
+  const gradeColor =
+    sec.grade === "A" ? "var(--color-risk-low)"
+    : sec.grade === "B" ? "var(--color-risk-low)"
+    : sec.grade === "C" ? "var(--color-risk-med)"
+    : "var(--color-risk-crit)";
+  return (
+    <div className="card p-6">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-bold">Web security: HTTPS &amp; headers</h2>
+        <span
+          className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+          style={{ color: gradeColor, background: "rgba(255,255,255,0.06)" }}
+        >
+          Grade {sec.grade}
+        </span>
+        <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
+          live check
+        </span>
+      </div>
+      <p className="mb-4 text-sm leading-relaxed text-fg/85">
+        How your site is <span className="italic">served</span> — its certificate and the HTTP
+        headers a browser relies on to block XSS, clickjacking and network attacks.
+      </p>
+      <div className="space-y-2.5">
+        {sec.checks.map((c) => {
+          const m = DSEC_META[c.status];
+          return (
+            <div key={c.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span>{m.icon}</span>
+                  <span className="font-semibold">{c.label}</span>
+                  <span className="text-sm text-fg/85">— {c.title}</span>
+                </div>
+                <span
+                  className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                  style={{ color: m.color, background: m.bg }}
+                >
+                  {m.label}
+                </span>
+              </div>
+              <p className="mt-1.5 text-sm text-muted">{c.detail}</p>
+              <div className="mt-2 font-mono text-[11px] text-muted/80">{c.evidence}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ReputationCard({ rep }: { rep: Reputation }) {
+  return (
+    <div className="card p-6">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-bold">Domain reputation</h2>
+        <span
+          className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+          style={{
+            color: rep.flagged ? "var(--color-risk-crit)" : "var(--color-risk-low)",
+            background: rep.flagged ? "rgba(244,63,94,0.14)" : "rgba(52,211,153,0.12)",
+          }}
+        >
+          {rep.flagged ? "Flagged" : "Clean"}
+        </span>
+        <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
+          live threat intel
+        </span>
+      </div>
+      <p className="mb-4 text-sm leading-relaxed text-fg/85">
+        {rep.flagged
+          ? `${rep.domain} is currently flagged by a threat-intelligence source for malware or phishing — treat this as an active incident.`
+          : `${rep.domain} isn't flagged on the ${rep.sourcesChecked} live source${rep.sourcesChecked === 1 ? "" : "s"} we could check.`}
+      </p>
+      <div className="space-y-2.5">
+        {rep.checks.map((c) => {
+          const m = DSEC_META[c.status];
+          return (
+            <div key={c.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span>{m.icon}</span>
+                  <span className="font-semibold">{c.label}</span>
+                  <span className="text-sm text-fg/85">— {c.title}</span>
+                </div>
+                <span
+                  className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                  style={{ color: m.color, background: m.bg }}
+                >
+                  {m.label}
+                </span>
+              </div>
+              <p className="mt-1.5 text-sm text-muted">{c.detail}</p>
+              <div className="mt-2 font-mono text-[11px] text-muted/80">{c.evidence}</div>
+            </div>
+          );
+        })}
+      </div>
+      {rep.notChecked.length > 0 && (
+        <p className="mt-3 text-[11px] text-muted">
+          Not checked:{" "}
+          {rep.notChecked.map((n) => `${n.name} (${n.reason})`).join(" · ")}
+        </p>
+      )}
     </div>
   );
 }

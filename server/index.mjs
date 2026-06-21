@@ -7,6 +7,8 @@ import { crawlDomain } from "./crawl.mjs";
 import { checkEmails } from "./breachlookup.mjs";
 import { auditDomainJs } from "./jsaudit.mjs";
 import { checkDomainSecurity } from "./domaincheck.mjs";
+import { checkWebSecurity } from "./webheaders.mjs";
+import { checkReputation } from "./reputation.mjs";
 
 const PORT = process.env.PORT || 8787;
 const MODEL = "claude-opus-4-8";
@@ -164,10 +166,44 @@ app.post("/api/domain-check", async (req, res) => {
   }
 });
 
+// BreachDetector: live check of TLS + HTTP security headers (how the site is served).
+app.post("/api/web-security", async (req, res) => {
+  const { domain } = req.body ?? {};
+  if (!domain || typeof domain !== "string") {
+    return res.status(400).json({ error: "domain_required" });
+  }
+  try {
+    const result = await checkWebSecurity(domain);
+    res.json(result);
+  } catch (err) {
+    const msg = err?.message || "web_security_error";
+    const code = msg === "invalid_domain" ? 400 : 500;
+    console.error("web-security error:", msg);
+    res.status(code).json({ error: msg });
+  }
+});
+
+// BreachDetector: live threat-intel / reputation lookup (URLhaus, OpenPhish, +keys).
+app.post("/api/reputation", async (req, res) => {
+  const { domain } = req.body ?? {};
+  if (!domain || typeof domain !== "string") {
+    return res.status(400).json({ error: "domain_required" });
+  }
+  try {
+    const result = await checkReputation(domain);
+    res.json(result);
+  } catch (err) {
+    const msg = err?.message || "reputation_error";
+    const code = msg === "invalid_domain" ? 400 : 500;
+    console.error("reputation error:", msg);
+    res.status(code).json({ error: msg });
+  }
+});
+
 // BreachDetector: turn raw exposure findings into risks + a plain-language plan.
 app.post("/api/breach-report", async (req, res) => {
   if (!client) return res.status(503).json({ error: "no_api_key" });
-  const { orgName, domain, emails, names, phones, breaches, domainSecurity } = req.body ?? {};
+  const { orgName, domain, emails, names, phones, breaches, domainSecurity, webSecurity, reputation } = req.body ?? {};
   try {
     const breachLines = (breaches || [])
       .map((b) => `- ${b.email}: ${b.breachCount} breach(es)${b.breaches?.length ? ` (${b.breaches.map((x) => x.title).join(", ")})` : ""}`)
@@ -178,6 +214,17 @@ app.post("/api/breach-report", async (req, res) => {
           .map((c) => `- ${c.label} [${c.status}]: ${c.title}`)
           .join("\n")
       : "Email-spoofing protection: not checked";
+    const webLines = webSecurity
+      ? `Web security headers / TLS (live check) — grade ${webSecurity.grade}; issues found:\n` +
+        ((webSecurity.checks || []).length
+          ? webSecurity.checks.map((c) => `- ${c.label} [${c.status}]: ${c.title}`).join("\n")
+          : "- none (all good)")
+      : "Web security headers: not checked";
+    const repLines = reputation
+      ? reputation.flagged
+        ? `Threat-intelligence reputation (live): FLAGGED — ${(reputation.hits || []).map((c) => `${c.label}: ${c.title}`).join("; ")}`
+        : "Threat-intelligence reputation (live): not flagged on the sources checked"
+      : "Threat-intelligence reputation: not checked";
     const result = await client.messages.create({
       model: MODEL,
       max_tokens: 16000,
@@ -185,8 +232,9 @@ app.post("/api/breach-report", async (req, res) => {
       output_config: { effort: "medium", format: { type: "json_schema", schema: BREACH_REPORT_SCHEMA } },
       system:
         "You advise small nonprofits with no IT staff. A scan of their public website found staff emails, " +
-        "names and phone numbers, checked those emails against known data breaches, and checked via live DNS " +
-        "whether the domain can be spoofed in email (SPF/DMARC/DKIM). " +
+        "names and phone numbers, checked those emails against known data breaches, checked via live DNS " +
+        "whether the domain can be spoofed in email (SPF/DMARC/DKIM), and checked the site's TLS certificate and " +
+        "HTTP security headers (CSP/HSTS/X-Frame-Options, etc.). " +
         "Explain, in plain language a volunteer can act on, the concrete RISKS this exposure creates " +
         "(who an attacker could impersonate, what a breached password lets them do, how harvested names/phones enable " +
         "phishing and vishing, and what an unprotected domain lets attackers send), the real-world CONSEQUENCES, and WHO is at risk. " +
@@ -202,6 +250,8 @@ app.post("/api/breach-report", async (req, res) => {
             `Public phone numbers found: ${(phones || []).join(", ") || "none"}\n\n` +
             `Breach exposure per email:\n${breachLines || "none checked"}\n\n` +
             `${domainLines}\n\n` +
+            `${webLines}\n\n` +
+            `${repLines}\n\n` +
             `Write a 2-3 sentence summary, 3-5 risks, and 4-6 ordered action steps.`,
         },
       ],
