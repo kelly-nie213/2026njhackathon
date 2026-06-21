@@ -6,12 +6,14 @@ import {
   crawlDomain,
   lookupBreaches,
   generateReport,
+  checkDomainSecurity,
   breachedAccounts,
   totalBreaches,
   SEVERITY_META,
   type CrawlResult,
   type BreachLookup,
   type BreachReport,
+  type DomainSecurity,
   type EmailBreach,
 } from "../lib/breach";
 
@@ -21,6 +23,7 @@ const SCAN_STEPS = [
   "Reaching the website…",
   "Crawling public pages for contact info…",
   "Extracting emails, names & phone numbers…",
+  "Checking your domain's email-spoofing protection (DNS)…",
   "Checking each email against breach databases…",
   "Assessing risks and writing your action plan…",
 ];
@@ -35,6 +38,7 @@ export default function BreachDetector() {
 
   const [crawl, setCrawl] = useState<CrawlResult | null>(null);
   const [lookup, setLookup] = useState<BreachLookup | null>(null);
+  const [domainSec, setDomainSec] = useState<DomainSecurity | null>(null);
   const [report, setReport] = useState<BreachReport | null>(null);
   const [reportSource, setReportSource] = useState<"ai" | "fallback">("fallback");
 
@@ -50,18 +54,24 @@ export default function BreachDetector() {
       setStep(1);
       const crawlRes = await crawlDomain(cleanDomain);
       setCrawl(crawlRes);
-      setStep(3);
 
-      const lookupRes = crawlRes.emails.length
-        ? await lookupBreaches(crawlRes.emails)
-        : { source: "demo" as const, results: [] };
+      // Domain spoofing check (live DNS) and breach lookup are independent — run together.
+      setStep(3);
+      const [domainSecRes, lookupRes] = await Promise.all([
+        checkDomainSecurity(cleanDomain),
+        crawlRes.emails.length
+          ? lookupBreaches(crawlRes.emails)
+          : Promise.resolve({ source: "live" as const, results: [] }),
+      ]);
+      setDomainSec(domainSecRes);
       setLookup(lookupRes);
-      setStep(4);
+      setStep(5);
 
       const { report: rep, source } = await generateReport(
         crawlRes,
         lookupRes,
-        orgName.trim() || crawlRes.domain
+        orgName.trim() || crawlRes.domain,
+        domainSecRes
       );
       setReport(rep);
       setReportSource(source);
@@ -83,6 +93,7 @@ export default function BreachDetector() {
     setPhase("input");
     setCrawl(null);
     setLookup(null);
+    setDomainSec(null);
     setReport(null);
     setStep(0);
   };
@@ -140,6 +151,7 @@ export default function BreachDetector() {
               orgName={orgName.trim() || crawl.domain}
               crawl={crawl}
               lookup={lookup}
+              domainSec={domainSec}
               report={report}
               reportSource={reportSource}
               onReset={resetAll}
@@ -203,6 +215,7 @@ function InputView(props: {
           {[
             "Finds the emails & contact info an attacker would scrape first",
             "Checks each address against known breaches (XposedOrNot)",
+            "Tests whether your domain can be spoofed in email (SPF/DMARC/DKIM)",
             "Turns it into risks, consequences, and a step-by-step plan",
           ].map((t) => (
             <li key={t} className="flex items-start gap-3 text-fg/90">
@@ -331,11 +344,12 @@ function ReportView(props: {
   orgName: string;
   crawl: CrawlResult;
   lookup: BreachLookup;
+  domainSec: DomainSecurity | null;
   report: BreachReport;
   reportSource: "ai" | "fallback";
   onReset: () => void;
 }) {
-  const { orgName, crawl, lookup, report, reportSource, onReset } = props;
+  const { orgName, crawl, lookup, domainSec, report, reportSource, onReset } = props;
   const breachedCount = breachedAccounts(lookup);
   const totalB = totalBreaches(lookup);
 
@@ -362,11 +376,10 @@ function ReportView(props: {
         </button>
       </div>
 
-      {lookup.source === "demo" && crawl.emails.length > 0 && (
+      {lookup.source === "error" && crawl.emails.length > 0 && (
         <div className="rounded-lg border border-risk-med/30 bg-risk-med/10 px-3 py-2 text-xs text-risk-med">
-          ⚠ Couldn't reach the breach database, so results below are{" "}
-          <span className="font-semibold">simulated</span>. Check your connection and rescan for live
-          data.
+          ⚠ We couldn't reach the breach database, so the emails below{" "}
+          <span className="font-semibold">weren't checked</span>. Check your connection and rescan.
         </div>
       )}
 
@@ -412,6 +425,9 @@ function ReportView(props: {
           </div>
         )}
       </div>
+
+      {/* domain spoofing protection (live DNS) */}
+      {domainSec && <DomainSecurityCard sec={domainSec} />}
 
       {/* risks */}
       <div className="card p-6">
@@ -512,6 +528,63 @@ function ReportView(props: {
         )}
       </div>
     </motion.div>
+  );
+}
+
+const DSEC_META = {
+  pass: { icon: "🟢", color: "var(--color-risk-low)", bg: "rgba(52,211,153,0.12)", label: "OK" },
+  warn: { icon: "🟡", color: "var(--color-risk-med)", bg: "rgba(251,191,36,0.12)", label: "Weak" },
+  fail: { icon: "🔴", color: "var(--color-risk-crit)", bg: "rgba(244,63,94,0.14)", label: "Missing" },
+} as const;
+
+function DomainSecurityCard({ sec }: { sec: DomainSecurity }) {
+  return (
+    <div className="card p-6">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-bold">Email-spoofing protection</h2>
+        <span
+          className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+          style={{
+            color: sec.spoofable ? "var(--color-risk-crit)" : "var(--color-risk-low)",
+            background: sec.spoofable ? "rgba(244,63,94,0.14)" : "rgba(52,211,153,0.12)",
+          }}
+        >
+          {sec.spoofable ? "Spoofable" : "Protected"}
+        </span>
+        <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-300">
+          live DNS check
+        </span>
+      </div>
+      <p className="mb-4 text-sm leading-relaxed text-fg/85">
+        {sec.spoofable
+          ? `Right now an attacker can send email that looks like it comes from ${sec.domain} — the records that stop that aren't fully in place.`
+          : `${sec.domain} has the DNS records that make it hard to forge email from your address. Keep them in place.`}
+      </p>
+      <div className="space-y-2.5">
+        {sec.checks.map((c) => {
+          const m = DSEC_META[c.status];
+          return (
+            <div key={c.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span>{m.icon}</span>
+                  <span className="font-semibold">{c.label}</span>
+                  <span className="text-sm text-fg/85">— {c.title}</span>
+                </div>
+                <span
+                  className="flex-none rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                  style={{ color: m.color, background: m.bg }}
+                >
+                  {m.label}
+                </span>
+              </div>
+              <p className="mt-1.5 text-sm text-muted">{c.detail}</p>
+              <div className="mt-2 font-mono text-[11px] text-muted/80">{c.evidence}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
