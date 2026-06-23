@@ -3,6 +3,9 @@
 // if no ANTHROPIC_API_KEY is set, they return 503 and the client falls back.
 import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import fs from "fs";
 import { crawlDomain } from "./crawl.mjs";
 import { checkEmails } from "./breachlookup.mjs";
 import { auditDomainJs } from "./jsaudit.mjs";
@@ -464,6 +467,13 @@ app.post("/api/advisor", async (req, res) => {
     res.status(502).json({ error: "ai_error" });
   }
 });
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const distDir = join(__dirname, "..", "dist");
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get("*", (_req, res) => res.sendFile(join(distDir, "index.html")));
+}
 
 app.listen(PORT, () => {
   console.log(
